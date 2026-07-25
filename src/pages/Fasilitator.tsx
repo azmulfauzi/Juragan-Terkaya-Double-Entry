@@ -102,6 +102,11 @@ function Dashboard() {
     [daftarSoal, state?.soal_id],
   )
 
+  const petaNama = useMemo(
+    () => new Map(peserta.map((p) => [p.id, p.nama])),
+    [peserta],
+  )
+
   async function aksi(jalankan: () => Promise<void>) {
     setSibuk(true)
     setGalat(null)
@@ -326,10 +331,6 @@ function Dashboard() {
                   <p className="text-xs text-slate-300">
                     {sudahKirim} dari {peserta.length} peserta sudah mengirim jurnal
                   </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    Benar/salah sengaja tidak ditampilkan sebelum reveal — layar ini dianggap
-                    terlihat peserta.
-                  </p>
                 </div>
 
                 {state.reveal && soalAktif && (
@@ -367,16 +368,30 @@ function Dashboard() {
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {DAFTAR_WARNA.map((w) => {
-                  const jumlah = warna.filter(
-                    (p) => p.putaran === state.putaran && p.warna === w,
-                  ).length
+                  const pemilih = warna
+                    .filter((p) => p.putaran === state.putaran && p.warna === w)
+                    .map((p) => petaNama.get(p.peserta_id) ?? '(peserta keluar)')
+                    .sort((a, b) => a.localeCompare(b, 'id'))
                   return (
                     <div
                       key={w}
-                      className={`rounded-lg border border-slate-700 p-2 text-center ${WARNA_META[w].bgLembut}`}
+                      className={`rounded-lg border border-slate-700 p-2 ${WARNA_META[w].bgLembut}`}
                     >
-                      <p className="text-lg">{WARNA_META[w].emoji}</p>
-                      <p className="tabular-nums text-sm font-bold text-slate-100">{jumlah}</p>
+                      <div className="text-center">
+                        <p className="text-lg">{WARNA_META[w].emoji}</p>
+                        <p className="tabular-nums text-sm font-bold text-slate-100">
+                          {pemilih.length}
+                        </p>
+                      </div>
+                      {pemilih.length > 0 && (
+                        <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto border-t border-slate-700/60 pt-1 text-[11px] leading-tight text-slate-200">
+                          {pemilih.map((nama, i) => (
+                            <li key={i} className="truncate" title={nama}>
+                              {nama}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   )
                 })}
