@@ -1,7 +1,7 @@
-import type { Soal } from '../lib/types'
+import type { SoalBenih } from '../lib/types'
 
 /**
- * BANK SOAL AWAL — 44 kasus.
+ * BANK SOAL AWAL — 50 kasus (44 transaksi biasa + 6 soal asuransi).
  *
  * Data ini hanya dipakai sekali: saat tabel `soal` di Supabase masih kosong.
  * Setelah itu bank soal hidup di database dan diedit lewat UI fasilitator,
@@ -23,10 +23,15 @@ import type { Soal } from '../lib/types'
  *    saat mengundi, dan label ini tidak boleh tampil di layar peserta sebelum
  *    reveal — "Kas Keluar" saja sudah cukup membocorkan sisi kreditnya.
  *
- * ⚠️ Setiap soal wajib lolos validasiSoal() di src/lib/api.ts: opsi_debit
+ * ⚠️ Setiap soal wajib lolos validasiSoal() di src/lib/validasi.ts: opsi_debit
  *    memuat debit_benar, opsi_kredit memuat kredit_benar, dan keduanya berbeda.
+ *
+ * `jenis` boleh dihilangkan — soal tanpa keterangan dianggap 'biasa' (diundi
+ * acak, roda menentukan siapa yang membukukan). Enam soal asuransi di bagian
+ * bawah memakai jenis 'keputusan' dan 'kejadian'; keduanya TIDAK ikut undian
+ * acak dan hanya muncul lewat tombol khusus di halaman fasilitator.
  */
-export const SOAL_DEFAULT: Soal[] = [
+export const SOAL_DEFAULT: SoalBenih[] = [
   // ───────────────────────────── KAS MASUK ─────────────────────────────
   {
     id: 1,
@@ -561,5 +566,107 @@ export const SOAL_DEFAULT: Soal[] = [
     kredit_benar: '1-300',
     insight:
       'Prive tidak selalu berupa uang. Barang yang diambil untuk keluarga mengurangi Persediaan, bukan Kas — dan tetap dicatat sebagai Prive, bukan penjualan.',
+  },
+
+  // ══════════════════ PENAWARAN ASURANSI (jenis: keputusan) ══════════════════
+  //
+  // Dimunculkan fasilitator lewat tombol khusus, bukan undian acak. SELURUH
+  // peserta memutuskan untuk usahanya sendiri — di luar mekanik roda, karena
+  // kalau hanya yang warnanya keluar boleh membeli, yang tertimpa kebakaran
+  // nanti hampir pasti orang lain yang tidak pernah ditawari.
+  //
+  // Tidak dihitung dalam akurasi: ini strategi, bukan ujian. Pelajarannya
+  // datang dari akibatnya, bukan dari skornya.
+  {
+    id: 45,
+    kategori: 'kas_keluar',
+    jenis: 'keputusan',
+    polis: 'kebakaran',
+    teks: 'Agen asuransi menawarkan pertanggungan kebakaran untuk kios dan isinya, premi Rp1.200.000 untuk perlindungan 1 tahun penuh. Beli, atau simpan uangnya?',
+    nominal: 1_200_000,
+    opsi_debit: ['1-600', '5-700', '5-600', '1-400'],
+    opsi_kredit: ['1-100', '1-600', '2-100', '5-700'],
+    debit_benar: '1-600',
+    kredit_benar: '1-100',
+    insight:
+      'Premi 1 tahun yang dibayar di muka BELUM menjadi beban — manfaatnya baru akan dinikmati sepanjang tahun ke depan, jadi ia masih aset: Asuransi Dibayar Dimuka. Perhatikan bahwa membeli polis membuat kas berkurang Rp1.200.000 hari ini, sementara yang menolak kasnya utuh. Sampai di sini, yang menolak terlihat lebih pintar.',
+  },
+  {
+    id: 46,
+    kategori: 'kas_keluar',
+    jenis: 'keputusan',
+    polis: 'kendaraan',
+    teks: 'Asuransi kendaraan untuk motor dan mobil operasional ditawarkan seharga Rp900.000 per tahun. Ambil, atau lewati?',
+    nominal: 900_000,
+    opsi_debit: ['1-600', '5-700', '5-500', '1-500'],
+    opsi_kredit: ['1-100', '1-600', '2-200', '5-500'],
+    debit_benar: '1-600',
+    kredit_benar: '1-100',
+    insight:
+      'Sama seperti asuransi kebakaran: dibayar di muka untuk 1 tahun, jadi dicatat sebagai aset, bukan Beban Transportasi. Kendaraan operasional dipakai tiap hari di jalan — pertanyaannya bukan apakah risikonya ada, tapi apakah usahamu sanggup menanggungnya sendiri kalau terjadi.',
+  },
+
+  // ══════════════════════ MUSIBAH (jenis: kejadian) ══════════════════════
+  //
+  // Dimunculkan fasilitator, roda menentukan siapa yang tertimpa.
+  //
+  // Peserta yang punya polis aktif TIDAK menjurnal apa pun — kerugiannya
+  // ditanggung penanggung. Yang tidak berasuransi mencatat kerugiannya sendiri,
+  // dan di situlah selisih laporannya terlihat mencolok saat dibandingkan.
+  {
+    id: 47,
+    kategori: 'non_kas',
+    jenis: 'kejadian',
+    polis: 'kebakaran',
+    teks: 'Terjadi kebakaran di gudang. Seluruh persediaan barang dagangan senilai Rp3.500.000 habis terbakar.',
+    nominal: 3_500_000,
+    opsi_debit: ['5-600', '1-300', '5-100', '3-200'],
+    opsi_kredit: ['1-300', '1-100', '5-600', '2-100'],
+    debit_benar: '5-600',
+    kredit_benar: '1-300',
+    insight:
+      'Barangnya lenyap, jadi Persediaan dikredit; nilainya diakui sebagai kerugian di Beban Lain-lain. Sekarang bandingkan dua peserta: yang berasuransi kasnya berkurang Rp1.200.000 di awal tapi asetnya utuh; yang menolak menghemat Rp1.200.000 tapi kehilangan Rp3.500.000 sekaligus. Premi selalu terasa mahal — sampai kebakaran benar-benar terjadi.',
+  },
+  {
+    id: 48,
+    kategori: 'non_kas',
+    jenis: 'kejadian',
+    polis: 'kebakaran',
+    teks: 'Korsleting listrik malam hari membakar sebagian kios. Etalase dan mesin pengaduk senilai Rp2.500.000 rusak total dan tidak bisa dipakai lagi.',
+    nominal: 2_500_000,
+    opsi_debit: ['5-600', '1-500', '5-400', '3-200'],
+    opsi_kredit: ['1-500', '1-100', '5-600', '2-100'],
+    debit_benar: '5-600',
+    kredit_benar: '1-500',
+    insight:
+      'Yang musnah kali ini Peralatan, bukan Persediaan — akun kreditnya ikut berubah, tapi polanya sama: aset yang hilang dikredit, kerugiannya didebit. Peralatan yang terbakar tidak bisa dijual dan tidak bisa dipakai; nilainya harus keluar dari neraca.',
+  },
+  {
+    id: 49,
+    kategori: 'non_kas',
+    jenis: 'kejadian',
+    polis: 'kendaraan',
+    teks: 'Motor operasional menabrak pembatas jalan saat mengantar pesanan. Biaya kerusakannya Rp2.000.000 dan motor tercatat di akun Peralatan.',
+    nominal: 2_000_000,
+    opsi_debit: ['5-600', '5-500', '1-500', '3-200'],
+    opsi_kredit: ['1-500', '1-100', '5-500', '2-100'],
+    debit_benar: '5-600',
+    kredit_benar: '1-500',
+    insight:
+      'Godaannya memilih Beban Transportasi karena menyangkut kendaraan. Tapi Beban Transportasi untuk biaya operasional rutin seperti bensin dan ongkos kirim — kerusakan aset akibat kecelakaan adalah kerugian, dan nilai asetnya berkurang.',
+  },
+  {
+    id: 50,
+    kategori: 'non_kas',
+    jenis: 'kejadian',
+    polis: 'kendaraan',
+    teks: 'Mobil pengantaran terlibat kecelakaan. Kendaraan ringsek dan seluruh muatan barang dagangan senilai Rp4.000.000 rusak tidak terselamatkan.',
+    nominal: 4_000_000,
+    opsi_debit: ['5-600', '1-300', '5-500', '5-100'],
+    opsi_kredit: ['1-300', '1-500', '1-100', '5-600'],
+    debit_benar: '5-600',
+    kredit_benar: '1-300',
+    insight:
+      'Perhatikan baik-baik apa yang hilang: yang dinilai di sini adalah muatannya, yaitu Persediaan. Peserta yang otomatis memilih Peralatan karena membaca kata "mobil" akan salah. Selalu tanya dulu: aset mana yang benar-benar berkurang?',
   },
 ]

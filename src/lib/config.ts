@@ -21,6 +21,13 @@ export const DURASI_PILIH_WARNA = 10
  */
 export const DURASI_JURNAL = 45
 
+/**
+ * Durasi fase keputusan asuransi (detik).
+ * Lebih panjang dari fase menjurnal biasa karena peserta melakukan dua hal:
+ * menimbang beli atau tidak, lalu menyusun jurnalnya kalau jadi membeli.
+ */
+export const DURASI_KEPUTUSAN = 60
+
 /** Berapa soal terakhir yang diingat sistem agar tidak cepat berulang. */
 export const RIWAYAT_SOAL_MAX = 20
 
@@ -35,7 +42,9 @@ export const RIWAYAT_SOAL_MAX = 20
  */
 
 /** PIN akses halaman fasilitator. Ubah lewat file .env (VITE_FASILITATOR_PIN). */
-export const FASILITATOR_PIN = import.meta.env.VITE_FASILITATOR_PIN || '2024'
+// Tanda tanya pada `env?.` bukan basa-basi: berkas ini ikut ter-bundel saat
+// menjalankan `npm run uji` di Node, tempat import.meta.env tidak ada sama sekali.
+export const FASILITATOR_PIN = import.meta.env?.VITE_FASILITATOR_PIN || '2024'
 
 /**
  * Warna murni undian nasib.

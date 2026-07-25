@@ -15,17 +15,27 @@ import TimerRing from '../components/TimerRing'
 import {
   ambilJudulSoal,
   ambilJurnalPeserta,
+  ambilKeputusanPeserta,
   ambilPeserta,
   ambilPilihanWarnaSaya,
   ambilSoalLengkap,
   ambilSoalTanpaKunci,
   daftarPeserta,
+  polisAktif,
   simpanJurnal,
+  simpanKeputusan,
   simpanPilihanWarna,
 } from '../lib/api'
 import { namaAkun } from '../lib/akun'
 import { urutanAcak } from '../lib/acak'
-import { DAFTAR_WARNA, DURASI_JURNAL, DURASI_PILIH_WARNA, MODAL_AWAL, WARNA_META } from '../lib/config'
+import {
+  DAFTAR_WARNA,
+  DURASI_JURNAL,
+  DURASI_KEPUTUSAN,
+  DURASI_PILIH_WARNA,
+  MODAL_AWAL,
+  WARNA_META,
+} from '../lib/config'
 import { rupiah } from '../lib/format'
 import {
   bacaIdPeserta,
@@ -37,7 +47,16 @@ import {
 import { susunPembukuan } from '../lib/laporan'
 import { lamaJawabMs } from '../lib/waktu'
 import { useVersiKedaluwarsa } from '../lib/versi'
-import type { Jurnal, Peserta as TipePeserta, PilihanWarna, Soal, SoalTanpaKunci, Warna } from '../lib/types'
+import type {
+  Jurnal,
+  Keputusan,
+  Peserta as TipePeserta,
+  PilihanWarna,
+  Polis,
+  Soal,
+  SoalTanpaKunci,
+  Warna,
+} from '../lib/types'
 
 export default function Peserta() {
   const { state, koneksi } = useGameState()
@@ -46,6 +65,7 @@ export default function Peserta() {
   const [peserta, setPeserta] = useState<TipePeserta | null>(null)
   const [memuatPeserta, setMemuatPeserta] = useState(true)
   const [jurnalSaya, setJurnalSaya] = useState<Jurnal[]>([])
+  const [keputusanSaya, setKeputusanSaya] = useState<Keputusan[]>([])
   const [pilihanSaya, setPilihanSaya] = useState<PilihanWarna | null>(null)
   const [soal, setSoal] = useState<SoalTanpaKunci | null>(null)
   const [soalLengkap, setSoalLengkap] = useState<Soal | null>(null)
@@ -73,7 +93,12 @@ export default function Peserta() {
   const muatJurnal = useCallback(async () => {
     if (!peserta) return
     try {
-      setJurnalSaya(await ambilJurnalPeserta(peserta.id))
+      const [j, k] = await Promise.all([
+        ambilJurnalPeserta(peserta.id),
+        ambilKeputusanPeserta(peserta.id),
+      ])
+      setJurnalSaya(j)
+      setKeputusanSaya(k)
     } catch (e) {
       setGalat(e instanceof Error ? e.message : String(e))
     }
@@ -82,7 +107,7 @@ export default function Peserta() {
   useEffect(() => {
     void muatJurnal()
   }, [muatJurnal])
-  useRealtimeTabel(['jurnal'], muatJurnal)
+  useRealtimeTabel(['jurnal', 'keputusan'], muatJurnal)
 
   // Hanya teks soal yang benar-benar ada di pembukuannya sendiri.
   const idSoalSaya = useMemo(
@@ -131,6 +156,13 @@ export default function Peserta() {
   )
 
   const buku = useMemo(() => susunPembukuan(jurnalSaya, petaSoal), [jurnalSaya, petaSoal])
+
+  const polisSaya = useMemo(() => polisAktif(keputusanSaya), [keputusanSaya])
+
+  const keputusanPutaranIni = useMemo(
+    () => keputusanSaya.find((k) => k.putaran === putaran) ?? null,
+    [keputusanSaya, putaran],
+  )
 
   const statistik = useMemo(() => {
     const wajib = jurnalSaya.filter((j) => j.wajib && j.putaran > 0)
@@ -182,10 +214,19 @@ export default function Peserta() {
             </p>
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-2 text-[11px]">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
           <IndikatorKoneksi status={koneksi} />
           <span className="text-slate-500">·</span>
           <span className="text-slate-400">Putaran {putaran || '—'}</span>
+          {[...polisSaya].map((p) => (
+            <span
+              key={p}
+              className="rounded-md border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 font-semibold text-sky-300"
+              title="Polis aktif sampai permainan selesai"
+            >
+              {p === 'kendaraan' ? '🚗' : '🔥'} terlindungi
+            </span>
+          ))}
         </div>
       </div>
 
@@ -212,6 +253,21 @@ export default function Peserta() {
               setPilihanSaya(await ambilPilihanWarnaSaya(peserta.id, state.putaran))
             }}
           />
+        ) : state.fase === 'keputusan' ? (
+          <FaseKeputusan
+            key={`k-${state.putaran}-${state.soal_id}`}
+            pesertaId={peserta.id}
+            putaran={state.putaran}
+            faseMulai={state.fase_mulai}
+            soal={soal}
+            soalLengkap={soalLengkap}
+            reveal={state.reveal}
+            showInsight={state.show_insight}
+            keputusan={keputusanPutaranIni}
+            jurnalSaya={jurnalPutaranIni}
+            onTerkirim={muatJurnal}
+            onGalat={setGalat}
+          />
         ) : state.fase === 'menjurnal' ? (
           <FaseMenjurnal
             key={`${state.putaran}-${state.soal_id}`}
@@ -226,6 +282,7 @@ export default function Peserta() {
             reveal={state.reveal}
             showInsight={state.show_insight}
             jurnalSaya={jurnalPutaranIni}
+            punyaPolis={Boolean(soal?.polis && polisSaya.has(soal.polis))}
             onTerkirim={muatJurnal}
             onGalat={setGalat}
           />
@@ -389,6 +446,258 @@ function FasePilihWarna({
   )
 }
 
+// ──────────────────────── FASE KEPUTUSAN (ASURANSI) ────────────────────────
+
+const LABEL_POLIS: Record<Polis, string> = {
+  kebakaran: '🔥 Asuransi Kebakaran',
+  kendaraan: '🚗 Asuransi Kendaraan',
+}
+
+/**
+ * Penawaran asuransi. Seluruh peserta memutuskan, tanpa roda dan tanpa status
+ * wajib — ini keputusan untuk usahanya sendiri, bukan transaksi yang menimpanya.
+ *
+ * Polis baru tercatat bersamaan dengan jurnalnya dikirim. Kalau keduanya
+ * dipisah, peserta bisa menekan "beli" lalu sengaja tidak menjurnal, dan
+ * mendapat perlindungan tanpa kasnya berkurang sepeser pun.
+ */
+function FaseKeputusan({
+  pesertaId,
+  putaran,
+  faseMulai,
+  soal,
+  soalLengkap,
+  reveal,
+  showInsight,
+  keputusan,
+  jurnalSaya,
+  onTerkirim,
+  onGalat,
+}: {
+  pesertaId: string
+  putaran: number
+  faseMulai: string | null
+  soal: SoalTanpaKunci | null
+  soalLengkap: Soal | null
+  reveal: boolean
+  showInsight: boolean
+  keputusan: Keputusan | null
+  jurnalSaya: Jurnal | null
+  onTerkirim: () => void
+  onGalat: (pesan: string) => void
+}) {
+  const sisa = useSisaWaktu(faseMulai, DURASI_KEPUTUSAN)
+  const [mauBeli, setMauBeli] = useState(false)
+  const [debit, setDebit] = useState<string | null>(null)
+  const [kredit, setKredit] = useState<string | null>(null)
+  const [sibuk, setSibuk] = useState(false)
+
+  const opsiDebit = useMemo(
+    () => (soal ? urutanAcak(soal.opsi_debit, `${pesertaId}-${soal.id}-D`) : []),
+    [soal, pesertaId],
+  )
+  const opsiKredit = useMemo(
+    () => (soal ? urutanAcak(soal.opsi_kredit, `${pesertaId}-${soal.id}-K`) : []),
+    [soal, pesertaId],
+  )
+
+  async function tolak() {
+    if (!soal?.polis) return
+    setSibuk(true)
+    try {
+      await simpanKeputusan(pesertaId, putaran, soal.id, soal.polis, false)
+      onTerkirim()
+    } catch (e) {
+      onGalat(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSibuk(false)
+    }
+  }
+
+  async function beliDanJurnal() {
+    if (!soal?.polis || !debit || !kredit) return
+    setSibuk(true)
+    try {
+      await simpanKeputusan(pesertaId, putaran, soal.id, soal.polis, true)
+      await simpanJurnal({
+        peserta_id: pesertaId,
+        putaran,
+        soal_id: soal.id,
+        akun_debit: debit,
+        akun_kredit: kredit,
+        nominal: soal.nominal,
+        wajib: false, // keputusan asuransi tidak masuk hitungan akurasi
+        waktu_jawab_ms: lamaJawabMs(faseMulai),
+      })
+      onTerkirim()
+    } catch (e) {
+      onGalat(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSibuk(false)
+    }
+  }
+
+  if (!soal) {
+    return (
+      <Kartu>
+        <p className="text-center text-sm text-slate-300">Menyiapkan penawaran…</p>
+      </Kartu>
+    )
+  }
+
+  const sudahPutus = Boolean(keputusan)
+  const membeli = keputusan?.ambil === true
+  const habis = sisa === 0
+
+  return (
+    <div className="space-y-3">
+      <Kartu>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-sky-300">
+              {soal.polis ? LABEL_POLIS[soal.polis] : 'Tawaran'}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-100">{soal.teks}</p>
+            <p className="mt-2 text-lg font-bold text-amber-300">{rupiah(soal.nominal)}</p>
+          </div>
+          {!reveal && <TimerRing sisa={sisa} total={DURASI_KEPUTUSAN} ukuran={64} />}
+        </div>
+
+        <p className="mb-3 rounded-lg bg-slate-900/60 px-3 py-2 text-[11px] leading-relaxed text-slate-400">
+          Keputusan ini milikmu sendiri — tidak ditentukan roda dan tidak dihitung dalam akurasi.
+          Yang membeli wajib menjurnal preminya. Polis berlaku sampai permainan selesai.
+        </p>
+
+        {sudahPutus ? (
+          <div className="rounded-xl border border-slate-600 bg-slate-900/60 p-3">
+            {membeli ? (
+              <>
+                <p className="mb-2 text-center text-xs font-semibold text-sky-300">
+                  🛡️ Kamu membeli polis ini. Jurnal yang kamu kirim:
+                </p>
+                {jurnalSaya && (
+                  <BarisJurnal
+                    debit={jurnalSaya.akun_debit}
+                    kredit={jurnalSaya.akun_kredit}
+                    nominal={jurnalSaya.nominal}
+                  />
+                )}
+              </>
+            ) : (
+              <p className="text-center text-xs font-semibold text-slate-300">
+                Kamu memilih tidak berasuransi. Kasmu utuh — dan risikonya kamu tanggung sendiri.
+              </p>
+            )}
+          </div>
+        ) : habis ? (
+          <p className="rounded-xl border border-slate-600 bg-slate-900/60 px-3 py-2 text-center text-xs text-slate-300">
+            ⏱️ Waktu habis. Kamu tidak jadi membeli polis, dan tidak ada yang dicatat.
+          </p>
+        ) : mauBeli ? (
+          <>
+            <p className="mb-2 text-xs font-semibold text-sky-300">
+              Susun jurnal pembayaran preminya:
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <KolomAkun
+                judul="DEBIT"
+                warna="text-sky-300"
+                opsi={opsiDebit}
+                terpilih={debit}
+                nonaktif={kredit}
+                onPilih={setDebit}
+              />
+              <KolomAkun
+                judul="KREDIT"
+                warna="text-purple-300"
+                opsi={opsiKredit}
+                terpilih={kredit}
+                nonaktif={debit}
+                onPilih={setKredit}
+              />
+            </div>
+
+            {debit && kredit && (
+              <div className="animasi-muncul mt-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3">
+                <p className="mb-2 text-xs font-semibold text-amber-200">Pratinjau jurnal:</p>
+                <BarisJurnal debit={debit} kredit={kredit} nominal={soal.nominal} />
+              </div>
+            )}
+
+            <button
+              onClick={beliDanJurnal}
+              disabled={!debit || !kredit || sibuk}
+              className="mt-3 w-full rounded-xl bg-amber-500 py-3 font-bold text-slate-900 transition hover:bg-amber-400 active:scale-[.98] disabled:opacity-40"
+            >
+              {sibuk ? 'Mengirim…' : 'Beli Polis & Catat Jurnal'}
+            </button>
+            <button
+              onClick={() => setMauBeli(false)}
+              disabled={sibuk}
+              className="mt-2 w-full rounded-xl py-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
+            >
+              Batal, pikir ulang
+            </button>
+          </>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              onClick={() => setMauBeli(true)}
+              disabled={sibuk}
+              className="rounded-xl bg-sky-600 py-4 font-bold text-white transition hover:bg-sky-500 active:scale-[.98] disabled:opacity-40"
+            >
+              🛡️ Beli polis
+            </button>
+            <button
+              onClick={tolak}
+              disabled={sibuk}
+              className="rounded-xl border border-slate-600 py-4 font-bold text-slate-300 transition hover:bg-slate-700 active:scale-[.98] disabled:opacity-40"
+            >
+              Tidak, simpan uangnya
+            </button>
+          </div>
+        )}
+      </Kartu>
+
+      {reveal && soalLengkap && (
+        <Kartu>
+          <p className="mb-2 text-sm font-bold text-slate-100">
+            Jurnal yang benar bagi yang membeli
+          </p>
+          <div className="rounded-xl border border-green-500/40 bg-green-500/10 p-3">
+            <BarisJurnal
+              debit={soalLengkap.debit_benar}
+              kredit={soalLengkap.kredit_benar}
+              nominal={soalLengkap.nominal}
+            />
+          </div>
+
+          {membeli && jurnalSaya && (
+            <p
+              className={`mt-3 rounded-lg border px-3 py-2 text-xs font-semibold ${
+                jurnalSaya.benar
+                  ? 'border-green-500/40 bg-green-500/10 text-green-300'
+                  : 'border-red-500/40 bg-red-500/10 text-red-200'
+              }`}
+            >
+              {jurnalSaya.benar
+                ? '✅ Jurnalmu benar dan sudah dibukukan.'
+                : `❌ Jurnalmu belum tepat — seharusnya ${namaAkun(soalLengkap.debit_benar)} (D) / ${namaAkun(soalLengkap.kredit_benar)} (K). Jurnalmu tetap dibukukan apa adanya, tapi polismu tetap aktif.`}
+            </p>
+          )}
+
+          {showInsight && soalLengkap.insight && (
+            <div className="animasi-muncul mt-3 rounded-xl border border-sky-500/40 bg-sky-500/10 p-3">
+              <p className="mb-1 text-xs font-bold text-sky-300">💡 Insight</p>
+              <p className="text-xs leading-relaxed text-slate-200">{soalLengkap.insight}</p>
+            </div>
+          )}
+        </Kartu>
+      )}
+    </div>
+  )
+}
+
 // ───────────────────────────── FASE MENJURNAL ─────────────────────────────
 
 function FaseMenjurnal({
@@ -403,6 +712,7 @@ function FaseMenjurnal({
   reveal,
   showInsight,
   jurnalSaya,
+  punyaPolis,
   onTerkirim,
   onGalat,
 }: {
@@ -417,6 +727,8 @@ function FaseMenjurnal({
   reveal: boolean
   showInsight: boolean
   jurnalSaya: Jurnal | null
+  /** Peserta memegang polis yang cocok dengan musibah putaran ini. */
+  punyaPolis: boolean
   onTerkirim: () => void
   onGalat: (pesan: string) => void
 }) {
@@ -424,6 +736,7 @@ function FaseMenjurnal({
   const [debit, setDebit] = useState<string | null>(null)
   const [kredit, setKredit] = useState<string | null>(null)
   const [sibuk, setSibuk] = useState(false)
+  const musibah = soal?.jenis === 'kejadian'
 
   const sudahKirim = Boolean(jurnalSaya)
   const habis = sisa === 0
@@ -439,19 +752,21 @@ function FaseMenjurnal({
     [soal, pesertaId],
   )
 
-  async function kirim() {
-    if (!soal || !debit || !kredit) return
+  async function kirim(tanpaJurnal = false) {
+    if (!soal) return
+    if (!tanpaJurnal && (!debit || !kredit)) return
     setSibuk(true)
     try {
       await simpanJurnal({
         peserta_id: pesertaId,
         putaran,
         soal_id: soal.id,
-        akun_debit: debit,
-        akun_kredit: kredit,
+        akun_debit: tanpaJurnal ? null : debit,
+        akun_kredit: tanpaJurnal ? null : kredit,
         nominal: soal.nominal,
         wajib,
         waktu_jawab_ms: lamaJawabMs(faseMulai),
+        tanpa_jurnal: tanpaJurnal,
       })
       onTerkirim()
     } catch (e) {
@@ -501,10 +816,39 @@ function FaseMenjurnal({
           {!reveal && <TimerRing sisa={sisa} total={DURASI_JURNAL} ukuran={64} />}
         </div>
 
+        {/* Status polis — informasi milik peserta sendiri, jadi tidak ada yang
+            bocor dengan menampilkannya. Menyembunyikannya justru tidak adil:
+            di dunia nyata pemilik usaha tahu persis ia berasuransi atau tidak. */}
+        {musibah && (
+          <div
+            className={`mb-3 rounded-xl border px-3 py-2 text-xs font-semibold ${
+              punyaPolis
+                ? 'border-sky-500/40 bg-sky-500/10 text-sky-200'
+                : 'border-red-500/40 bg-red-500/10 text-red-200'
+            }`}
+          >
+            {punyaPolis
+              ? '🛡️ Kamu punya polis yang menanggung kejadian ini.'
+              : '⚠️ Kamu tidak punya polis untuk kejadian ini.'}
+          </div>
+        )}
+
         {sudahKirim ? (
           <div className="rounded-xl border border-slate-600 bg-slate-900/60 p-3">
-            <p className="mb-2 text-xs font-semibold text-slate-300">Jurnal yang kamu kirim:</p>
-            <BarisJurnal debit={jurnalSaya!.akun_debit} kredit={jurnalSaya!.akun_kredit} nominal={jurnalSaya!.nominal} />
+            {jurnalSaya!.tanpa_jurnal ? (
+              <p className="text-center text-xs font-semibold text-slate-200">
+                🛡️ Kamu menyatakan tidak ada jurnal yang perlu dicatat.
+              </p>
+            ) : (
+              <>
+                <p className="mb-2 text-xs font-semibold text-slate-300">Jurnal yang kamu kirim:</p>
+                <BarisJurnal
+                  debit={jurnalSaya!.akun_debit}
+                  kredit={jurnalSaya!.akun_kredit}
+                  nominal={jurnalSaya!.nominal}
+                />
+              </>
+            )}
             {!reveal && (
               <p className="mt-2 text-center text-[11px] text-slate-400">
                 ✅ Terkirim. Hasilnya dibuka setelah fasilitator menutup waktu.
@@ -547,12 +891,25 @@ function FaseMenjurnal({
             )}
 
             <button
-              onClick={kirim}
+              onClick={() => kirim()}
               disabled={!debit || !kredit || sibuk}
               className="mt-3 w-full rounded-xl bg-amber-500 py-3 font-bold text-slate-900 transition hover:bg-amber-400 active:scale-[.98] disabled:opacity-40"
             >
               {sibuk ? 'Mengirim…' : 'Catat Jurnal'}
             </button>
+
+            {/* Tombol ini muncul untuk semua peserta, bukan hanya pemegang
+                polis. Yang tidak berasuransi tetap harus sadar bahwa kerugian
+                ini menjadi tanggungannya sendiri. */}
+            {musibah && (
+              <button
+                onClick={() => kirim(true)}
+                disabled={sibuk}
+                className="mt-2 w-full rounded-xl border border-sky-500/50 bg-sky-500/10 py-3 text-sm font-bold text-sky-200 transition hover:bg-sky-500/20 active:scale-[.98] disabled:opacity-40"
+              >
+                🛡️ Tidak ada jurnal — ditanggung asuransi
+              </button>
+            )}
           </>
         )}
       </Kartu>
@@ -560,21 +917,63 @@ function FaseMenjurnal({
       {/* Setelah reveal */}
       {reveal && soalLengkap && (
         <Kartu>
-          <p className="mb-2 text-sm font-bold text-slate-100">Jurnal yang benar</p>
-          <div className="rounded-xl border border-green-500/40 bg-green-500/10 p-3">
-            <BarisJurnal
-              debit={soalLengkap.debit_benar}
-              kredit={soalLengkap.kredit_benar}
-              nominal={soalLengkap.nominal}
-            />
-          </div>
+          {musibah && punyaPolis ? (
+            <>
+              <p className="mb-2 text-sm font-bold text-slate-100">
+                Jawaban yang benar untukmu: tidak ada jurnal
+              </p>
+              <div className="rounded-xl border border-sky-500/40 bg-sky-500/10 p-3 text-xs leading-relaxed text-sky-100">
+                🛡️ Polismu menanggung kerugian ini, jadi tidak ada nilai yang berkurang dari
+                pembukuanmu. Bandingkan nanti dengan peserta yang tidak berasuransi — jurnal di
+                bawah inilah yang harus mereka catat.
+              </div>
+              <p className="mb-2 mt-3 text-xs font-semibold text-slate-400">
+                Jurnal bagi yang tidak berasuransi:
+              </p>
+              <div className="rounded-xl border border-slate-600 bg-slate-900/60 p-3 opacity-80">
+                <BarisJurnal
+                  debit={soalLengkap.debit_benar}
+                  kredit={soalLengkap.kredit_benar}
+                  nominal={soalLengkap.nominal}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-2 text-sm font-bold text-slate-100">Jurnal yang benar</p>
+              <div className="rounded-xl border border-green-500/40 bg-green-500/10 p-3">
+                <BarisJurnal
+                  debit={soalLengkap.debit_benar}
+                  kredit={soalLengkap.kredit_benar}
+                  nominal={soalLengkap.nominal}
+                />
+              </div>
+            </>
+          )}
 
           {sudahKirim && (
             <div className="mt-3">
               {jurnalSaya!.benar ? (
                 <p className="rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300">
-                  ✅ Jurnalmu benar{wajib ? ' dan sudah diposting ke pembukuanmu.' : ' (latihan).'}
+                  ✅ Jawabanmu benar{wajib ? ' dan sudah dibukukan.' : ' (latihan).'}
                 </p>
+              ) : musibah && punyaPolis ? (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  <p className="font-semibold">❌ Seharusnya kamu tidak menjurnal apa pun.</p>
+                  <p className="mt-1">
+                    Kerugian ini ditanggung asuransimu. Mencatatnya sebagai kerugian membuat
+                    labamu terlihat lebih kecil dari yang sebenarnya.
+                  </p>
+                </div>
+              ) : musibah && jurnalSaya!.tanpa_jurnal ? (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  <p className="font-semibold">❌ Kamu tidak punya polis untuk kejadian ini.</p>
+                  <p className="mt-1">
+                    Kerugiannya menjadi tanggunganmu sendiri, jadi harus dicatat:{' '}
+                    {namaAkun(soalLengkap.debit_benar)} (D) / {namaAkun(soalLengkap.kredit_benar)}{' '}
+                    (K).
+                  </p>
+                </div>
               ) : (
                 <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
                   <p className="font-semibold">❌ Jurnalmu belum tepat.</p>

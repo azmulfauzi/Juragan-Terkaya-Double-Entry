@@ -18,6 +18,14 @@ export function validasiSoal(soal: Soal): string | null {
   if (!soal.teks.trim()) return 'Teks kasus belum diisi.'
   if (!Number.isFinite(soal.nominal) || soal.nominal <= 0) return 'Nominal harus lebih dari 0.'
 
+  // Soal keputusan dan kejadian saling terhubung lewat jenis polisnya. Tanpa
+  // polis, soal kebakaran tidak tahu pertanggungan mana yang harus diperiksa,
+  // dan semua peserta akan dianggap tidak berasuransi.
+  if (soal.jenis !== 'biasa' && !soal.polis)
+    return 'Soal keputusan dan kejadian wajib menyebut jenis polisnya (kebakaran / kendaraan).'
+  if (soal.jenis === 'biasa' && soal.polis)
+    return 'Soal biasa tidak boleh punya jenis polis — kosongkan dulu.'
+
   if (soal.opsi_debit.length !== 4) return 'Opsi Debit harus tepat 4 akun.'
   if (soal.opsi_kredit.length !== 4) return 'Opsi Kredit harus tepat 4 akun.'
 

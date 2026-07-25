@@ -25,6 +25,9 @@ export const BAGAN_AKUN: Akun[] = [
   { kode: '1-300', nama: 'Persediaan', kelompok: 'aset', saldoNormal: 'D' },
   { kode: '1-400', nama: 'Perlengkapan', kelompok: 'aset', saldoNormal: 'D' },
   { kode: '1-500', nama: 'Peralatan', kelompok: 'aset', saldoNormal: 'D' },
+  // Premi asuransi 1 tahun dibayar di muka: manfaatnya belum terpakai, jadi ia
+  // masih ASET — bukan beban. Berpindah ke Beban Asuransi seiring waktu.
+  { kode: '1-600', nama: 'Asuransi Dibayar Dimuka', kelompok: 'aset', saldoNormal: 'D' },
 
   { kode: '2-100', nama: 'Hutang Usaha', kelompok: 'kewajiban', saldoNormal: 'K' },
   { kode: '2-200', nama: 'Hutang Bank', kelompok: 'kewajiban', saldoNormal: 'K' },
@@ -44,6 +47,7 @@ export const BAGAN_AKUN: Akun[] = [
   { kode: '5-400', nama: 'Beban Listrik & Air', kelompok: 'beban', saldoNormal: 'D' },
   { kode: '5-500', nama: 'Beban Transportasi', kelompok: 'beban', saldoNormal: 'D' },
   { kode: '5-600', nama: 'Beban Lain-lain', kelompok: 'beban', saldoNormal: 'D' },
+  { kode: '5-700', nama: 'Beban Asuransi', kelompok: 'beban', saldoNormal: 'D' },
 ]
 
 const PETA_AKUN = new Map(BAGAN_AKUN.map((a) => [a.kode, a]))

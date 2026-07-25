@@ -37,6 +37,7 @@ function j(
     wajib: putaran > 0,
     waktu_jawab_ms: 5000,
     diterapkan: true,
+    tanpa_jurnal: false,
     created_at: '',
     ...extra,
   }

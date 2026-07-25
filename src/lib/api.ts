@@ -1,12 +1,13 @@
 import { supabase } from './supabase'
 import { SOAL_DEFAULT } from '../data/soal'
-import { DAFTAR_WARNA, RIWAYAT_SOAL_MAX } from './config'
 import { validasiSoal } from './validasi'
 import type {
   GameState,
   Jurnal,
+  Keputusan,
   Peserta,
   PilihanWarna,
+  Polis,
   Soal,
   SoalTanpaKunci,
   Warna,
@@ -111,11 +112,13 @@ export interface JurnalBaru {
   peserta_id: string
   putaran: number
   soal_id: number
-  akun_debit: string
-  akun_kredit: string
+  akun_debit: string | null
+  akun_kredit: string | null
   nominal: number
   wajib: boolean
   waktu_jawab_ms: number | null
+  /** true bila peserta menyatakan tidak ada jurnal yang perlu dicatat. */
+  tanpa_jurnal?: boolean
 }
 
 /**
@@ -165,10 +168,53 @@ export async function ambilJurnalSaya(
   return data
 }
 
+// ────────────────────────── KEPUTUSAN ASURANSI ──────────────────────────
+
+/**
+ * Menyimpan keputusan peserta atas penawaran asuransi.
+ *
+ * Yang menolak pun dicatat (ambil = false), supaya fasilitator bisa melihat
+ * siapa yang sudah memutuskan dan siapa yang masih diam.
+ */
+export async function simpanKeputusan(
+  pesertaId: string,
+  putaran: number,
+  soalId: number,
+  polis: Polis,
+  ambil: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from('keputusan')
+    .upsert(
+      { peserta_id: pesertaId, putaran, soal_id: soalId, polis, ambil },
+      { onConflict: 'peserta_id,putaran', ignoreDuplicates: true },
+    )
+  if (error) throw new Error(`Gagal menyimpan keputusan: ${error.message}`)
+}
+
+export async function ambilSemuaKeputusan(): Promise<Keputusan[]> {
+  const { data, error } = await supabase.from('keputusan').select('*')
+  return cek(data, error, 'Gagal membaca keputusan asuransi')
+}
+
+export async function ambilKeputusanPeserta(pesertaId: string): Promise<Keputusan[]> {
+  const { data, error } = await supabase
+    .from('keputusan')
+    .select('*')
+    .eq('peserta_id', pesertaId)
+    .order('putaran', { ascending: true })
+  return cek(data, error, 'Gagal membaca keputusan asuransi')
+}
+
+/** Polis yang aktif milik seorang peserta. Berlaku sampai permainan selesai. */
+export function polisAktif(keputusan: Keputusan[]): Set<Polis> {
+  return new Set(keputusan.filter((k) => k.ambil).map((k) => k.polis))
+}
+
 // ──────────────────────────────── SOAL ────────────────────────────────
 
 /** Kolom soal TANPA kunci jawaban — inilah yang boleh diambil halaman peserta. */
-const KOLOM_TANPA_KUNCI = 'id, kategori, teks, nominal, opsi_debit, opsi_kredit'
+const KOLOM_TANPA_KUNCI = 'id, kategori, jenis, polis, teks, nominal, opsi_debit, opsi_kredit'
 
 /**
  * Soal untuk ditampilkan ke peserta selama putaran berjalan.
@@ -219,7 +265,14 @@ export async function seedSoalJikaKosong(): Promise<Soal[]> {
   if (error) throw new Error(`Gagal memeriksa bank soal: ${error.message}`)
 
   if ((count ?? 0) === 0) {
-    const { error: errInsert } = await supabase.from('soal').insert(SOAL_DEFAULT)
+    // Soal benih boleh tidak menyebut jenis/polis; keduanya diisi di sini agar
+    // 44 soal lama tidak perlu ditulisi satu per satu.
+    const benih: Soal[] = SOAL_DEFAULT.map((s) => ({
+      jenis: 'biasa',
+      polis: null,
+      ...s,
+    }))
+    const { error: errInsert } = await supabase.from('soal').insert(benih)
     if (errInsert) throw new Error(`Gagal mengisi bank soal awal: ${errInsert.message}`)
   }
   return ambilSemuaSoal()
@@ -237,46 +290,5 @@ export async function hapusSoal(id: number): Promise<void> {
   if (error) throw new Error(`Gagal menghapus soal: ${error.message}`)
 }
 
-// ──────────────────── UNDIAN SOAL & RODA WARNA ────────────────────
-
-/**
- * Memilih 1 soal acak dari SELURUH bank soal, tanpa memandang warna.
- * Menghindari soal yang baru dipakai; bila semuanya sudah terpakai, riwayat
- * diabaikan.
- *
- * ⚠️ Jangan pernah menambahkan filter warna di sini. Begitu warna terhubung ke
- *    jenis transaksi, peserta akan hafal dalam dua-tiga putaran dan unsur
- *    keberuntungannya mati.
- */
-export function pilihSoalAcak(semuaSoal: Soal[], riwayat: number[]): Soal | null {
-  if (semuaSoal.length === 0) return null
-
-  const belumDipakai = semuaSoal.filter((s) => !riwayat.includes(s.id))
-  const kandidat = belumDipakai.length > 0 ? belumDipakai : semuaSoal
-  return kandidat[Math.floor(Math.random() * kandidat.length)]
-}
-
-/** Menambahkan id soal ke riwayat, memotong agar tidak melebihi batas. */
-export function tambahRiwayat(riwayat: number[], soalId: number): number[] {
-  return [...riwayat.filter((id) => id !== soalId), soalId].slice(-RIWAYAT_SOAL_MAX)
-}
-
-/**
- * Mengundi warna pemenang roda.
- *
- * Warna yang sudah keluar dua kali berturut-turut dikeluarkan dari undian, agar
- * pada sesi pendek tidak ada peserta yang kebagian tiga kali beruntun sementara
- * yang lain belum sekali pun. Unsur untung-untungannya tetap utuh.
- */
-export function undiWarna(riwayatWarna: Warna[]): Warna {
-  const duaTerakhir = riwayatWarna.slice(-2)
-  const beruntun =
-    duaTerakhir.length === 2 && duaTerakhir[0] === duaTerakhir[1] ? duaTerakhir[0] : null
-
-  const kandidat = beruntun ? DAFTAR_WARNA.filter((w) => w !== beruntun) : DAFTAR_WARNA
-  return kandidat[Math.floor(Math.random() * kandidat.length)]
-}
-
-export function tambahRiwayatWarna(riwayat: Warna[], warna: Warna): Warna[] {
-  return [...riwayat, warna].slice(-10)
-}
+// Undian soal & roda warna kini tinggal di src/lib/undian.ts — modul murni,
+// supaya bisa diuji tanpa menyeret klien Supabase ke dalam bundelnya.

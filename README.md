@@ -19,6 +19,10 @@ dengan database yang terpisah.
    Jangan pakai project v1 — nama tabelnya mirip tapi strukturnya berbeda total.
 2. Buka **SQL Editor → New query**, jalankan seluruh isi [`supabase/schema.sql`](supabase/schema.sql).
    Aman dijalankan berulang kali.
+
+   > Kalau database Anda dibuat sebelum mekanik asuransi ada, jalankan juga
+   > [`supabase/migrasi-01-asuransi.sql`](supabase/migrasi-01-asuransi.sql). Untuk
+   > database baru, `schema.sql` saja sudah lengkap.
 3. Buka **Project Settings → Data API**, salin **Project URL** dan **anon key**.
 4. Salin `.env.example` menjadi `.env`, isi kedua nilai tersebut dan tentukan
    `VITE_FASILITATOR_PIN`.
@@ -67,6 +71,28 @@ pertama kali. Setelah itu bank soal hidup di database dan diedit lewat UI.
 
 Jalankan **minimal 12–16 putaran** supaya sebaran warna sempat merata.
 
+## Asuransi & musibah
+
+Dua jenis putaran khusus, dimunculkan lewat tombol tersendiri — bukan undian acak.
+
+**🛡️ Tawaran asuransi** (dari fase menunggu). **Seluruh** peserta memutuskan beli atau tidak,
+tanpa roda dan tanpa status wajib. Yang membeli harus menjurnal preminya sendiri
+(`Asuransi Dibayar Dimuka (D) / Kas (K)`) — polis baru tercatat saat jurnalnya terkirim, supaya
+tidak ada yang mendapat perlindungan tanpa kasnya berkurang. Putaran ini **tidak dihitung dalam
+akurasi**: ini keputusan strategi, bukan ujian.
+
+**💥 Musibah** (dari fase pilih warna, menggantikan undian acak). Roda tetap menentukan siapa yang
+tertimpa. Peserta yang punya polis cocok **tidak menjurnal apa pun** — mereka menekan tombol
+"Tidak ada jurnal". Yang tidak berasuransi mencatat kerugiannya sendiri
+(`Beban Lain-lain (D) / Persediaan atau Peralatan (K)`). Putaran ini **dihitung normal** dalam
+akurasi.
+
+Urutan yang disarankan: tawarkan asuransi di awal, jalankan beberapa putaran biasa, baru
+munculkan musibahnya. Bandingkan Neraca dua peserta di tab Perbandingan — premi selalu terasa
+mahal sampai kebakaran benar-benar terjadi.
+
+Polis berlaku sampai permainan selesai, dan ikut terhapus saat Reset.
+
 ## Penentuan pemenang
 
 Akurasi adalah gerbang, saldo adalah pemeringkat:
@@ -99,6 +125,7 @@ src/
     akun.ts       Bagan akun (konstanta, tidak diedit fasilitator)
     laporan.ts    ★ Mesin pembukuan — modul murni, satu-satunya tempat rumus laporan
     peringkat.ts  ★ Aturan penentuan pemenang
+    undian.ts     ★ Undian soal & roda warna (keduanya sengaja saling lepas)
     validasi.ts   Aturan sahnya sebuah soal
     api.ts        Seluruh akses Supabase
     hooks.ts      Realtime + polling cadangan + timer terselaraskan jam server
@@ -106,9 +133,10 @@ src/
     versi.ts      Deteksi halaman kedaluwarsa
   components/     Komponen UI, termasuk Pembukuan (5 tab laporan) dan EditorSoal
   pages/          Home, Peserta, Fasilitator
-  data/soal.ts    Bank soal awal (44 kasus)
+  data/soal.ts    Bank soal awal (44 transaksi + 6 soal asuransi)
 supabase/
-  schema.sql      Tabel, RLS, realtime, dan fungsi reset/penilaian/waktu server
+  schema.sql                Tabel, RLS, realtime, fungsi reset/penilaian/waktu server
+  migrasi-01-asuransi.sql   Tambahan mekanik asuransi untuk database lama
 uji/              Uji tanpa kerangka tambahan (npm run uji)
 ```
 

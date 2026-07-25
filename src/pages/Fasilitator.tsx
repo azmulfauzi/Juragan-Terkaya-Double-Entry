@@ -9,25 +9,29 @@ import SpinWheel from '../components/SpinWheel'
 import TimerRing from '../components/TimerRing'
 import {
   ambilSemuaJurnal,
+  ambilSemuaKeputusan,
   ambilSemuaPeserta,
   ambilSemuaPilihanWarna,
-  pilihSoalAcak,
   resetGame,
   seedSoalJikaKosong,
-  tambahRiwayat,
-  tambahRiwayatWarna,
   terapkanPutaran,
   ubahGameState,
-  undiWarna,
 } from '../lib/api'
+import { pilihSoalAcak, tambahRiwayat, tambahRiwayatWarna, undiWarna } from '../lib/undian'
 import { namaAkun } from '../lib/akun'
-import { DAFTAR_WARNA, DURASI_JURNAL, DURASI_PILIH_WARNA, WARNA_META } from '../lib/config'
+import {
+  DAFTAR_WARNA,
+  DURASI_JURNAL,
+  DURASI_KEPUTUSAN,
+  DURASI_PILIH_WARNA,
+  WARNA_META,
+} from '../lib/config'
 import { angka, detik, rupiah } from '../lib/format'
 import { useGameState, useRealtimeTabel, useSisaWaktu } from '../lib/hooks'
 import { hitungPeringkat } from '../lib/peringkat'
 import { sekarang } from '../lib/waktu'
 import { useVersiKedaluwarsa } from '../lib/versi'
-import type { Jurnal, Peserta, PilihanWarna, Soal } from '../lib/types'
+import type { Jurnal, Keputusan, Peserta, PilihanWarna, Soal } from '../lib/types'
 
 type Tab = 'kendali' | 'pembukuan' | 'perbandingan' | 'skor' | 'editor'
 
@@ -58,6 +62,7 @@ function Dashboard() {
   const [peserta, setPeserta] = useState<Peserta[]>([])
   const [jurnal, setJurnal] = useState<Jurnal[]>([])
   const [warna, setWarna] = useState<PilihanWarna[]>([])
+  const [keputusan, setKeputusan] = useState<Keputusan[]>([])
   const [daftarSoal, setDaftarSoal] = useState<Soal[]>([])
   const [galat, setGalat] = useState<string | null>(null)
   const [sibuk, setSibuk] = useState(false)
@@ -65,14 +70,16 @@ function Dashboard() {
 
   const muat = useCallback(async () => {
     try {
-      const [p, j, w] = await Promise.all([
+      const [p, j, w, k] = await Promise.all([
         ambilSemuaPeserta(),
         ambilSemuaJurnal(),
         ambilSemuaPilihanWarna(),
+        ambilSemuaKeputusan(),
       ])
       setPeserta(p)
       setJurnal(j)
       setWarna(w)
+      setKeputusan(k)
     } catch (e) {
       setGalat(e instanceof Error ? e.message : String(e))
     }
@@ -85,7 +92,7 @@ function Dashboard() {
       .catch((e) => setGalat(e instanceof Error ? e.message : String(e)))
   }, [muat])
 
-  useRealtimeTabel(['peserta', 'jurnal', 'pilihan_warna'], muat)
+  useRealtimeTabel(['peserta', 'jurnal', 'pilihan_warna', 'keputusan'], muat)
 
   const petaSoal = useMemo(
     () => new Map(daftarSoal.map((s) => [s.id, s.teks])),
@@ -106,6 +113,27 @@ function Dashboard() {
     () => new Map(peserta.map((p) => [p.id, p.nama])),
     [peserta],
   )
+
+  const soalKeputusan = useMemo(
+    () => daftarSoal.filter((s) => s.jenis === 'keputusan'),
+    [daftarSoal],
+  )
+  const soalKejadian = useMemo(
+    () => daftarSoal.filter((s) => s.jenis === 'kejadian'),
+    [daftarSoal],
+  )
+
+  /** Nama peserta pemegang tiap polis — bahan diskusi sebelum musibah dimunculkan. */
+  const pemegangPolis = useMemo(() => {
+    const hasil = new Map<string, string[]>()
+    for (const k of keputusan) {
+      if (!k.ambil) continue
+      const nama = petaNama.get(k.peserta_id)
+      if (!nama) continue
+      hasil.set(k.polis, [...(hasil.get(k.polis) ?? []), nama].sort((a, b) => a.localeCompare(b, 'id')))
+    }
+    return hasil
+  }, [keputusan, petaNama])
 
   async function aksi(jalankan: () => Promise<void>) {
     setSibuk(true)
@@ -156,6 +184,47 @@ function Dashboard() {
       })
     })
 
+  /**
+   * Menawarkan asuransi ke SELURUH peserta.
+   *
+   * Tidak ada fase pilih warna dan tidak ada roda: ini keputusan tiap orang
+   * untuk usahanya sendiri, bukan transaksi yang menimpa satu orang. Karena itu
+   * `warna_spin` sengaja dikosongkan — fungsi penilaian di server memakai itu
+   * untuk mengenali bahwa putaran ini tanpa peserta wajib.
+   */
+  const tawarkanAsuransi = (soal: Soal) =>
+    aksi(async () => {
+      if (!state) return
+      await ubahGameState({
+        berjalan: true,
+        fase: 'keputusan',
+        putaran: state.putaran + 1,
+        warna_spin: null,
+        soal_id: soal.id,
+        reveal: false,
+        show_insight: false,
+        fase_mulai: waktuISO(),
+      })
+    })
+
+  /**
+   * Memunculkan musibah. Dipanggil saat peserta sudah memilih warna, sehingga
+   * roda tetap yang menentukan siapa tertimpa — hanya soalnya saja yang dipilih
+   * fasilitator, bukan diundi.
+   */
+  const munculkanKejadian = (soal: Soal) =>
+    aksi(async () => {
+      if (!state) return
+      const hasilWarna = undiWarna(state.riwayat_warna ?? [])
+      await ubahGameState({
+        fase: 'menjurnal',
+        soal_id: soal.id,
+        warna_spin: hasilWarna,
+        fase_mulai: waktuISO(),
+        riwayat_warna: tambahRiwayatWarna(state.riwayat_warna ?? [], hasilWarna),
+      })
+    })
+
   const reveal = () =>
     aksi(async () => {
       if (!state) return
@@ -180,7 +249,11 @@ function Dashboard() {
 
   if (!state) return <Pusat>Memuat status game…</Pusat>
 
-  const sudahKirim = jurnal.filter((j) => j.putaran === state.putaran && j.akun_debit).length
+  const sudahKirim = jurnal.filter(
+    (j) => j.putaran === state.putaran && (j.akun_debit || j.tanpa_jurnal),
+  ).length
+  const keputusanPutaranIni = keputusan.filter((k) => k.putaran === state.putaran)
+  const yangMembeli = keputusanPutaranIni.filter((k) => k.ambil).length
   const wajibPutaranIni = warna.filter(
     (w) => w.putaran === state.putaran && w.warna === state.warna_spin,
   ).length
@@ -245,13 +318,17 @@ function Dashboard() {
                 <p className="text-lg font-bold text-slate-100">
                   {state.fase === 'pilih_warna'
                     ? 'Peserta memilih warna'
-                    : state.fase === 'menjurnal'
+                    : state.fase === 'keputusan'
                       ? state.reveal
                         ? 'Reveal & pembahasan'
-                        : 'Peserta menyusun jurnal'
-                      : state.fase === 'selesai'
-                        ? 'Permainan selesai'
-                        : 'Menunggu'}
+                        : 'Peserta memutuskan asuransi'
+                      : state.fase === 'menjurnal'
+                        ? state.reveal
+                          ? 'Reveal & pembahasan'
+                          : 'Peserta menyusun jurnal'
+                        : state.fase === 'selesai'
+                          ? 'Permainan selesai'
+                          : 'Menunggu'}
                 </p>
               </div>
               {state.fase === 'pilih_warna' && (
@@ -263,6 +340,13 @@ function Dashboard() {
               )}
               {state.fase === 'menjurnal' && !state.reveal && (
                 <TimerFase faseMulai={state.fase_mulai} durasi={DURASI_JURNAL} label="jurnal" />
+              )}
+              {state.fase === 'keputusan' && !state.reveal && (
+                <TimerFase
+                  faseMulai={state.fase_mulai}
+                  durasi={DURASI_KEPUTUSAN}
+                  label="putusan"
+                />
               )}
             </div>
 
@@ -277,7 +361,7 @@ function Dashboard() {
                   🎡 Putar Roda &amp; Undi Transaksi
                 </Tombol>
               )}
-              {state.fase === 'menjurnal' && !state.reveal && (
+              {(state.fase === 'menjurnal' || state.fase === 'keputusan') && !state.reveal && (
                 <Tombol onClick={reveal} sibuk={sibuk} utama>
                   🔓 Tutup Waktu &amp; Reveal
                 </Tombol>
@@ -305,6 +389,65 @@ function Dashboard() {
               </Tombol>
             </div>
           </Kartu>
+
+          {/* Tawaran asuransi — hanya dari fase menunggu, karena ia menggantikan
+              satu putaran penuh (tanpa pilih warna dan tanpa roda). */}
+          {(state.fase === 'menunggu' || state.fase === 'selesai') &&
+            soalKeputusan.length > 0 && (
+              <Kartu>
+                <p className="text-sm font-semibold text-slate-100">🛡️ Tawarkan asuransi</p>
+                <p className="mb-2 mt-0.5 text-[11px] leading-relaxed text-slate-400">
+                  Seluruh peserta memutuskan sendiri, tanpa roda. Tidak dihitung dalam akurasi.
+                  Tawarkan ini lebih dulu, baru munculkan musibahnya beberapa putaran kemudian.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {soalKeputusan.map((s) => (
+                    <Tombol key={s.id} onClick={() => tawarkanAsuransi(s)} sibuk={sibuk}>
+                      {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)}
+                      {pemegangPolis.has(s.polis ?? '') && ' · sudah pernah ditawarkan'}
+                    </Tombol>
+                  ))}
+                </div>
+              </Kartu>
+            )}
+
+          {/* Musibah — dimunculkan saat peserta sudah memilih warna, supaya roda
+              tetap yang menentukan siapa yang tertimpa. */}
+          {state.fase === 'pilih_warna' && soalKejadian.length > 0 && (
+            <Kartu>
+              <p className="text-sm font-semibold text-slate-100">💥 Atau munculkan musibah</p>
+              <p className="mb-2 mt-0.5 text-[11px] leading-relaxed text-slate-400">
+                Menggantikan undian acak untuk putaran ini. Roda tetap berputar menentukan
+                korbannya. Pemegang polis yang cocok tidak perlu menjurnal apa pun.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {soalKejadian.map((s) => (
+                  <Tombol key={s.id} onClick={() => munculkanKejadian(s)} sibuk={sibuk}>
+                    {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)} ·{' '}
+                    {(pemegangPolis.get(s.polis ?? '') ?? []).length} terlindungi
+                  </Tombol>
+                ))}
+              </div>
+            </Kartu>
+          )}
+
+          {pemegangPolis.size > 0 && (
+            <Kartu>
+              <p className="mb-2 text-sm font-semibold text-slate-100">🛡️ Pemegang polis aktif</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[...pemegangPolis.entries()].map(([polis, nama]) => (
+                  <div key={polis} className="rounded-lg border border-slate-700 p-2">
+                    <p className="text-xs font-semibold text-slate-300">
+                      {polis === 'kendaraan' ? '🚗 Kendaraan' : '🔥 Kebakaran'} · {nama.length} orang
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                      {nama.join(', ')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Kartu>
+          )}
 
           {state.fase === 'menjurnal' && (
             <div className="grid gap-3 md:grid-cols-2">
@@ -335,6 +478,13 @@ function Dashboard() {
 
                 {state.reveal && soalAktif && (
                   <div className="animasi-muncul mt-3 rounded-lg border border-green-500/40 bg-green-500/10 p-3">
+                    {soalAktif.jenis === 'kejadian' && (
+                      <p className="mb-2 rounded-md border border-sky-500/40 bg-sky-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-sky-200">
+                        🛡️ Pemegang polis {soalAktif.polis}: <b>tidak ada jurnal sama sekali</b> —
+                        kerugiannya ditanggung penanggung. Jurnal di bawah ini berlaku bagi yang
+                        tidak berasuransi.
+                      </p>
+                    )}
                     <p className="mb-1 text-xs font-bold text-green-300">Jurnal yang benar</p>
                     <div className="space-y-1 font-mono text-xs">
                       <div className="flex justify-between gap-3">
@@ -359,6 +509,56 @@ function Dashboard() {
                 )}
               </Kartu>
             </div>
+          )}
+
+          {state.fase === 'keputusan' && (
+            <Kartu>
+              <p className="text-xs uppercase tracking-wide text-slate-400">
+                Tawaran asuransi putaran ini
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-100">{soalAktif?.teks}</p>
+              <p className="mt-2 text-lg font-bold text-amber-300">
+                {soalAktif ? rupiah(soalAktif.nominal) : '—'}
+              </p>
+
+              <div className="mt-3 rounded-lg border border-slate-700 bg-slate-900/50 p-2">
+                <p className="text-xs text-slate-300">
+                  {keputusanPutaranIni.length} dari {peserta.length} peserta sudah memutuskan
+                </p>
+                {/* Jumlah yang membeli baru ditampilkan setelah reveal: kalau
+                    angkanya terlihat sejak awal, peserta akan ikut-ikutan
+                    mayoritas alih-alih menimbang sendiri. */}
+                {state.reveal && (
+                  <p className="mt-1 text-xs font-semibold text-amber-300">
+                    {yangMembeli} membeli polis · {keputusanPutaranIni.length - yangMembeli} memilih
+                    menyimpan uangnya
+                  </p>
+                )}
+              </div>
+
+              {state.reveal && soalAktif && (
+                <div className="animasi-muncul mt-3 rounded-lg border border-green-500/40 bg-green-500/10 p-3">
+                  <p className="mb-1 text-xs font-bold text-green-300">
+                    Jurnal yang benar bagi yang membeli
+                  </p>
+                  <div className="space-y-1 font-mono text-xs">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-slate-100">{namaAkun(soalAktif.debit_benar)}</span>
+                      <span className="tabular-nums text-slate-100">{angka(soalAktif.nominal)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3 pl-5">
+                      <span className="text-slate-400">{namaAkun(soalAktif.kredit_benar)}</span>
+                      <span className="tabular-nums text-slate-400">{angka(soalAktif.nominal)}</span>
+                    </div>
+                  </div>
+                  {state.show_insight && soalAktif.insight && (
+                    <p className="mt-2 border-t border-green-500/30 pt-2 text-xs leading-relaxed text-slate-200">
+                      💡 {soalAktif.insight}
+                    </p>
+                  )}
+                </div>
+              )}
+            </Kartu>
           )}
 
           {state.fase === 'pilih_warna' && (

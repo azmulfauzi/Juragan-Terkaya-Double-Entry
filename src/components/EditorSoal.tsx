@@ -4,7 +4,7 @@ import { KATEGORI_META } from '../lib/config'
 import { rupiah } from '../lib/format'
 import { ambilSemuaSoal, hapusSoal, simpanSoal } from '../lib/api'
 import { validasiSoal } from '../lib/validasi'
-import type { KategoriSoal, Soal } from '../lib/types'
+import type { JenisSoal, KategoriSoal, Polis, Soal } from '../lib/types'
 
 interface Props {
   onTutup: () => void
@@ -12,10 +12,34 @@ interface Props {
 
 const KATEGORI: KategoriSoal[] = ['kas_masuk', 'kas_keluar', 'non_kas', 'modal']
 
+const JENIS: { nilai: JenisSoal; label: string; petunjuk: string }[] = [
+  {
+    nilai: 'biasa',
+    label: 'Biasa',
+    petunjuk: 'Ikut undian acak. Roda menentukan siapa yang membukukan.',
+  },
+  {
+    nilai: 'keputusan',
+    label: 'Keputusan (tawaran asuransi)',
+    petunjuk:
+      'Tidak ikut undian. Dimunculkan lewat tombol fasilitator, seluruh peserta memutuskan beli atau tidak, dan tidak dihitung dalam akurasi.',
+  },
+  {
+    nilai: 'kejadian',
+    label: 'Kejadian (musibah)',
+    petunjuk:
+      'Tidak ikut undian. Dimunculkan lewat tombol fasilitator, roda menentukan korbannya. Pemegang polis yang cocok tidak menjurnal apa pun.',
+  },
+]
+
+const POLIS: Polis[] = ['kebakaran', 'kendaraan']
+
 function soalKosong(id: number): Soal {
   return {
     id,
     kategori: 'kas_masuk',
+    jenis: 'biasa',
+    polis: null,
     teks: '',
     nominal: 1_000_000,
     opsi_debit: ['1-100', '1-200', '1-300', '5-600'],
@@ -174,6 +198,12 @@ export default function EditorSoal({ onTutup }: Props) {
                   >
                     {KATEGORI_META[s.kategori].label}
                   </span>
+                  {s.jenis !== 'biasa' && (
+                    <span className="rounded-md border border-fuchsia-500/40 bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-300">
+                      {s.jenis === 'keputusan' ? '🛡️ Tawaran' : '💥 Musibah'} ·{' '}
+                      {s.polis === 'kendaraan' ? 'kendaraan' : 'kebakaran'}
+                    </span>
+                  )}
                   <span className="text-[11px] font-semibold text-amber-300">
                     {rupiah(s.nominal)}
                   </span>
@@ -290,6 +320,56 @@ function FormSoal({
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-xs font-medium text-slate-400">Jenis soal</span>
+          <select
+            value={soal.jenis}
+            onChange={(e) => {
+              const jenis = e.target.value as JenisSoal
+              // Soal biasa tidak boleh memegang polis, dan soal asuransi wajib
+              // punya — isi otomatis supaya tidak tertinggal separuh jalan.
+              onUbah({
+                ...soal,
+                jenis,
+                polis: jenis === 'biasa' ? null : (soal.polis ?? 'kebakaran'),
+              })
+            }}
+            className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-400"
+          >
+            {JENIS.map((j) => (
+              <option key={j.nilai} value={j.nilai}>
+                {j.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[10px] leading-relaxed text-slate-500">
+            {JENIS.find((j) => j.nilai === soal.jenis)?.petunjuk}
+          </span>
+        </label>
+
+        {soal.jenis !== 'biasa' && (
+          <label className="block">
+            <span className="text-xs font-medium text-slate-400">Jenis polis</span>
+            <select
+              value={soal.polis ?? 'kebakaran'}
+              onChange={(e) => onUbah({ ...soal, polis: e.target.value as Polis })}
+              className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-400"
+            >
+              {POLIS.map((p) => (
+                <option key={p} value={p}>
+                  {p === 'kebakaran' ? '🔥 Kebakaran' : '🚗 Kendaraan'}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[10px] leading-relaxed text-slate-500">
+              Inilah yang menghubungkan tawaran asuransi dengan musibahnya. Keduanya harus memakai
+              jenis polis yang sama.
+            </span>
+          </label>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
