@@ -4,12 +4,14 @@ import { JURNAL_MUTASI, batasiAlokasi } from './dompet'
 import { validasiSoal } from './validasi'
 import type {
   GameState,
+  HasilPercobaan,
   Jurnal,
   Keputusan,
   Mutasi,
   Peserta,
   PilihanWarna,
   Polis,
+  Sifat,
   Soal,
   SoalTanpaKunci,
   Warna,
@@ -285,6 +287,35 @@ export function polisAktif(keputusan: Keputusan[]): Set<Polis> {
 const KOLOM_TANPA_KUNCI = 'id, kategori, jenis, polis, teks, nominal, opsi_debit, opsi_kredit'
 
 /**
+ * Mengirim satu percobaan jawaban dan menerima hasilnya seketika.
+ *
+ * Penilaian dilakukan di server, dan kunci jawaban baru ikut terkirim setelah
+ * dua percobaan gagal. Sebelum itu, perangkat peserta memang tidak pernah
+ * memegang jawabannya — memindahkan pemeriksaan ini ke browser akan membuat
+ * kuncinya bisa dibaca lewat devtools sejak soal muncul.
+ */
+export async function cobaJawab(param: {
+  pesertaId: string
+  putaran: number
+  sifat: Sifat
+  akunDebit?: string | null
+  akunKredit?: string | null
+  tanpaJurnal?: boolean
+  waktuMs?: number | null
+}): Promise<HasilPercobaan> {
+  const { data, error } = await supabase.rpc('coba_jawab', {
+    p_peserta: param.pesertaId,
+    p_putaran: param.putaran,
+    p_sifat: param.sifat,
+    p_debit: param.akunDebit ?? null,
+    p_kredit: param.akunKredit ?? null,
+    p_tanpa_jurnal: param.tanpaJurnal ?? false,
+    p_waktu_ms: param.waktuMs ?? null,
+  })
+  return cek(data as HasilPercobaan | null, error, 'Gagal mengirim jawaban')
+}
+
+/**
  * Soal untuk ditampilkan ke peserta selama putaran berjalan.
  * Kunci jawaban tidak ikut terkirim ke browser peserta sebelum reveal.
  */
@@ -338,6 +369,8 @@ export async function seedSoalJikaKosong(): Promise<Soal[]> {
     const benih: Soal[] = SOAL_DEFAULT.map((s) => ({
       jenis: 'biasa',
       polis: null,
+      sifat: 'bisnis',
+      arah_kas: null,
       ...s,
     }))
     const { error: errInsert } = await supabase.from('soal').insert(benih)

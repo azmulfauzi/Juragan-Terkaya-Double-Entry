@@ -48,6 +48,7 @@ export default function Dompet({
   const [kredit, setKredit] = useState<string | null>(null)
   const [sibuk, setSibuk] = useState(false)
   const [hasil, setHasil] = useState<{ benar: boolean; pesan: string } | null>(null)
+  const [koreksi, setKoreksi] = useState<{ debit: string; kredit: string } | null>(null)
 
   const pribadi = saldoPribadi(alokasiBisnis, mutasi)
   const maksimum = arah === 'topup' ? pribadi : saldoKasBisnis
@@ -68,21 +69,33 @@ export default function Dompet({
     setJumlahTeks('')
     setDebit(null)
     setKredit(null)
+    setKoreksi(null)
   }
 
+  /**
+   * Perpindahan hanya jadi kalau jurnalnya benar.
+   *
+   * Berbeda dari jawaban soal yang boleh salah lalu dibetulkan, di sini uangnya
+   * memang belum berpindah sampai catatannya benar — peserta yang salah diberi
+   * tahu jurnal yang seharusnya, lalu diminta membetulkan sendiri. Mencatat
+   * perpindahan dengan jurnal keliru akan membuat modal atau prive-nya salah
+   * sepanjang sisa permainan.
+   */
   async function kirim() {
     if (!arah || !jumlahSah || !debit || !kredit) return
+
+    const kunci = JURNAL_MUTASI[arah]
+    if (debit !== kunci.debit || kredit !== kunci.kredit) {
+      setKoreksi(kunci)
+      setHasil(null)
+      return
+    }
+
     setSibuk(true)
     try {
       await simpanMutasi(pesertaId, arah, jumlah, putaran, debit, kredit)
-      const kunci = JURNAL_MUTASI[arah]
-      const benar = debit === kunci.debit && kredit === kunci.kredit
-      setHasil({
-        benar,
-        pesan: benar
-          ? `${rupiah(jumlah)} berpindah dan jurnalmu tepat.`
-          : `${rupiah(jumlah)} tetap berpindah, tapi jurnalmu keliru — seharusnya ${namaAkun(kunci.debit)} (D) / ${namaAkun(kunci.kredit)} (K). Uang bergerak menurut kenyataan, laporan bergerak menurut catatanmu.`,
-      })
+      setHasil({ benar: true, pesan: `${rupiah(jumlah)} berpindah dan jurnalmu tepat.` })
+      setKoreksi(null)
       tutup()
       onSelesai()
     } catch (e) {
@@ -208,6 +221,25 @@ export default function Dompet({
                 />
               </div>
 
+              {koreksi && (
+                <div className="animasi-muncul mt-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-2.5">
+                  <p className="text-[11px] font-bold text-amber-200">
+                    ❌ Jurnalnya belum tepat, jadi uangnya belum dipindahkan.
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-amber-100/80">
+                    {arah === 'topup'
+                      ? 'Menambah uang ke usaha berarti pemilik menyetor modal lagi — bukan pendapatan, karena usahanya tidak menghasilkan apa pun dari uang itu.'
+                      : 'Menarik uang usaha untuk keperluan pemilik adalah Prive — bukan beban, karena usahanya tidak mendapat manfaat apa pun.'}
+                  </p>
+                  <p className="mt-1.5 text-[11px] font-semibold text-amber-200">
+                    Seharusnya: {namaAkun(koreksi.debit)} (D) / {namaAkun(koreksi.kredit)} (K)
+                  </p>
+                  <p className="mt-1 text-[10px] text-amber-100/70">
+                    Betulkan pilihanmu di atas, lalu kirim lagi.
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={kirim}
                 disabled={!debit || !kredit || sibuk}
@@ -216,7 +248,7 @@ export default function Dompet({
                 {sibuk ? 'Memproses…' : 'Pindahkan & Catat Jurnal'}
               </button>
               <p className="mt-1.5 text-center text-[10px] text-slate-500">
-                Tidak dihitung dalam akurasi — sama seperti keputusan asuransi.
+                Uang baru berpindah setelah jurnalnya benar. Tidak dihitung dalam nilai.
               </p>
             </>
           )}

@@ -28,10 +28,24 @@ export interface StatPeserta {
   jumlahBenar: number
   /** 0–100. Bernilai null bila peserta belum pernah kebagian giliran. */
   persen: number | null
-  /** Rata-rata waktu menjawab (ms) pada giliran wajib; null bila tidak ada. */
+  /** Rata-rata waktu menjawab (ms) atas seluruh jawaban; null bila belum ada. */
   rataWaktuMs: number | null
-  /** true bila sudah pernah kebagian giliran DAN seluruh jurnalnya benar. */
+  /** true bila seluruh jawabannya tepat sejak percobaan pertama. */
   sempurna: boolean
+
+  // ── Nilai pemahaman: dari SELURUH jawaban, wajib maupun latihan ──
+  /** Total poin terkumpul. Inilah pemeringkat utama. */
+  nilai: number
+  /** Berapa soal yang dijawab sampai final (benar maupun habis percobaan). */
+  soalDijawab: number
+  /** Benar sejak percobaan pertama (100 poin). */
+  benarSekaliCoba: number
+  /** Benar pada percobaan kedua (50 poin). */
+  benarSetelahDiperbaiki: number
+  /** Habis tiga percobaan atau tidak menjawab (0 poin). */
+  belumBenar: number
+  /** Rata-rata poin per soal yang dijawab, 0–100. */
+  rataNilai: number | null
 }
 
 export interface HasilPeringkat {
@@ -40,29 +54,25 @@ export interface HasilPeringkat {
   adaSempurna: boolean
 }
 
+/**
+ * Urutan pemenang: Nilai → Total Kekayaan → Kecepatan.
+ *
+ * Nilai didahulukan karena ia satu-satunya ukuran yang bersih dari
+ * keberuntungan: setiap peserta boleh menjawab di setiap putaran, entah
+ * warnanya keluar atau tidak, jadi jumlah kesempatannya sama rata. Peserta
+ * yang tidak pernah kebagian giliran tetap bisa juara lewat pemahamannya.
+ *
+ * Total kekayaan menyusul sebagai pembeda kedua — di situlah undian warna,
+ * pilihan dompet, dan keputusan asuransi bekerja. Keberuntungan tetap punya
+ * tempat, hanya saja tidak bisa mengalahkan ketelitian.
+ */
 function bandingUmum(a: StatPeserta, b: StatPeserta): number {
-  // Peserta yang belum pernah kebagian giliran selalu di bawah: akurasinya
-  // tidak terdefinisi dan saldonya masih persis modal awal.
-  const aKosong = a.jumlahWajib === 0
-  const bKosong = b.jumlahWajib === 0
-  if (aKosong !== bKosong) return aKosong ? 1 : -1
+  if (a.nilai !== b.nilai) return b.nilai - a.nilai
+  if (a.totalKekayaan !== b.totalKekayaan) return b.totalKekayaan - a.totalKekayaan
 
-  // 1. Persentase jurnal benar — menyamakan kedudukan peserta yang jarang
-  //    kebagian, karena jumlah giliran tiap orang berbeda akibat undian warna.
-  const persenA = a.persen ?? -1
-  const persenB = b.persen ?? -1
-  if (persenA !== persenB) return persenB - persenA
-
-  // 2. Jumlah jurnal benar — menghargai yang lebih sering diuji.
-  if (a.jumlahBenar !== b.jumlahBenar) return b.jumlahBenar - a.jumlahBenar
-
-  // 3. Rata-rata waktu menjawab tercepat.
   const waktuA = a.rataWaktuMs ?? Number.POSITIVE_INFINITY
   const waktuB = b.rataWaktuMs ?? Number.POSITIVE_INFINITY
-  if (waktuA !== waktuB) return waktuA - waktuB
-
-  // 4. Total kekayaan tertinggi (kas bisnis + dompet pribadi).
-  return b.totalKekayaan - a.totalKekayaan
+  return waktuA - waktuB
 }
 
 export function hitungPeringkat(
@@ -95,13 +105,19 @@ export function hitungPeringkat(
     const milik = perPeserta.get(peserta.id) ?? []
     const dompetPribadi = saldoPribadi(peserta.alokasi_bisnis, mutasiPer.get(peserta.id) ?? [])
 
-    // Hanya giliran wajib yang dihitung. Jurnal latihan tidak ikut, baik
-    // menambah maupun mengurangi (PRD bagian 8).
-    const wajib = milik.filter((j) => j.wajib && j.putaran > 0)
+    // Giliran wajib — menentukan apa yang masuk pembukuannya.
+    const wajib = milik.filter((j) => j.wajib && j.putaran > 0 && j.jenis === 'soal')
     const jumlahWajib = wajib.length
     const jumlahBenar = wajib.filter((j) => j.benar).length
 
-    const waktu = wajib
+    // Nilai pemahaman — dari SELURUH jawaban, wajib maupun latihan. Peserta
+    // yang warnanya tidak keluar tetap menunjukkan pemahamannya; hanya
+    // jurnalnya saja yang tidak diposting.
+    const semuaJawaban = milik.filter((j) => j.jenis === 'soal' && j.putaran > 0)
+    const nilai = semuaJawaban.reduce((t, j) => t + (j.nilai ?? 0), 0)
+    const soalDijawab = semuaJawaban.length
+
+    const waktu = semuaJawaban
       .map((j) => j.waktu_jawab_ms)
       .filter((w): w is number => typeof w === 'number')
 
@@ -117,27 +133,35 @@ export function hitungPeringkat(
       jumlahBenar,
       persen: jumlahWajib > 0 ? Math.round((jumlahBenar / jumlahWajib) * 100) : null,
       rataWaktuMs: waktu.length > 0 ? waktu.reduce((t, w) => t + w, 0) / waktu.length : null,
-      sempurna: jumlahWajib > 0 && jumlahBenar === jumlahWajib,
+      nilai,
+      soalDijawab,
+      benarSekaliCoba: semuaJawaban.filter((j) => j.nilai === 100).length,
+      benarSetelahDiperbaiki: semuaJawaban.filter((j) => j.nilai === 50).length,
+      belumBenar: semuaJawaban.filter((j) => (j.nilai ?? 0) === 0).length,
+      rataNilai: soalDijawab > 0 ? Math.round(nilai / soalDijawab) : null,
+      sempurna: soalDijawab > 0 && nilai === soalDijawab * 100,
     }
   })
 
-  const sempurna = baris.filter((b) => b.sempurna)
-  const sisanya = baris.filter((b) => !b.sempurna)
+  // Satu urutan untuk semua — tidak ada lagi pengelompokan bertahap. Nilai
+  // sudah membedakan yang teliti dari yang tidak, jauh lebih halus daripada
+  // gerbang benar-salah biner yang dipakai sebelumnya.
+  const urut = [...baris].sort(bandingUmum)
 
-  // Tahap 1: kandidat sempurna diurutkan murni berdasarkan total kekayaan.
-  //
-  // Dua dompet dijumlahkan supaya keputusan alokasi di awal menjadi taruhan
-  // yang sesungguhnya: uang di bisnis bisa tumbuh dari penjualan tapi terancam
-  // kebakaran dan salah jurnal, uang di dompet pribadi aman tapi diam saja.
-  sempurna.sort(
+  return { baris: urut, adaSempurna: urut.some((b) => b.sempurna) }
+}
+
+/**
+ * Urutan untuk tab Pemahaman: murni soal seberapa paham peserta, tanpa
+ * menyinggung kekayaan sama sekali. Inilah bahan evaluasi materi setelah sesi.
+ */
+export function urutkanPemahaman(baris: StatPeserta[]): StatPeserta[] {
+  return [...baris].sort(
     (a, b) =>
-      b.totalKekayaan - a.totalKekayaan ||
+      b.benarSekaliCoba - a.benarSekaliCoba ||
+      b.nilai - a.nilai ||
       (a.rataWaktuMs ?? Number.POSITIVE_INFINITY) - (b.rataWaktuMs ?? Number.POSITIVE_INFINITY),
   )
-  // Tahap 2: sisanya (dan seluruh peserta bila tidak ada yang sempurna).
-  sisanya.sort(bandingUmum)
-
-  return { baris: [...sempurna, ...sisanya], adaSempurna: sempurna.length > 0 }
 }
 
 /** "4/5 benar" — dipakai badge peserta dan papan skor. */

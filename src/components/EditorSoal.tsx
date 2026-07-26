@@ -40,6 +40,8 @@ function soalKosong(id: number): Soal {
     kategori: 'kas_masuk',
     jenis: 'biasa',
     polis: null,
+    sifat: 'bisnis',
+    arah_kas: null,
     teks: '',
     nominal: 1_000_000,
     opsi_debit: ['1-100', '1-200', '1-300', '5-600'],

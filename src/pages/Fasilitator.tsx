@@ -29,18 +29,19 @@ import {
 } from '../lib/config'
 import { angka, detik, rupiah } from '../lib/format'
 import { useGameState, useRealtimeTabel, useSisaWaktu } from '../lib/hooks'
-import { hitungPeringkat } from '../lib/peringkat'
+import { hitungPeringkat, urutkanPemahaman } from '../lib/peringkat'
 import { sekarang } from '../lib/waktu'
 import { useVersiKedaluwarsa } from '../lib/versi'
 import type { Jurnal, Keputusan, Mutasi, Peserta, PilihanWarna, Soal } from '../lib/types'
 
-type Tab = 'kendali' | 'pembukuan' | 'perbandingan' | 'skor' | 'editor'
+type Tab = 'kendali' | 'pembukuan' | 'perbandingan' | 'skor' | 'pemahaman' | 'editor'
 
 const TAB: { id: Tab; label: string }[] = [
   { id: 'kendali', label: '🎛️ Kendali' },
   { id: 'pembukuan', label: '📊 Pembukuan Peserta' },
   { id: 'perbandingan', label: '⚖️ Perbandingan' },
   { id: 'skor', label: '🏆 Papan Skor' },
+  { id: 'pemahaman', label: '📚 Pemahaman' },
   { id: 'editor', label: '✏️ Editor Soal' },
 ]
 
@@ -755,6 +756,68 @@ function Dashboard() {
       {tab === 'skor' && (
         <Kartu>
           <PapanSkor hasil={peringkat} />
+        </Kartu>
+      )}
+
+      {tab === 'pemahaman' && (
+        <Kartu>
+          <p className="mb-1 text-sm font-semibold text-slate-100">
+            Sejauh mana peserta memahami materi
+          </p>
+          <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
+            Diurutkan dari jumlah jawaban yang tepat sejak percobaan pertama. Tabel ini bersih dari
+            keberuntungan: jawaban latihan ikut dihitung, jadi peserta yang warnanya jarang keluar
+            tetap terlihat pemahamannya. Pakai ini untuk menilai materi mana yang perlu diulang.
+          </p>
+          <div className="scroll-x">
+            <table className="w-full min-w-[620px] text-xs">
+              <thead>
+                <tr className="text-slate-400">
+                  <th className="px-2 py-1.5 text-left font-medium">#</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Nama</th>
+                  <th className="px-2 py-1.5 text-right font-medium">✅ Sekali coba</th>
+                  <th className="px-2 py-1.5 text-right font-medium">🔁 Setelah diperbaiki</th>
+                  <th className="px-2 py-1.5 text-right font-medium">❌ Belum benar</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Dijawab</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Nilai</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Rata Nilai</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Rata Waktu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {urutkanPemahaman(peringkat.baris).map((b, i) => (
+                  <tr key={b.peserta.id} className="border-t border-slate-800">
+                    <td className="px-2 py-2 text-slate-400">{i + 1}</td>
+                    <td className="px-2 py-2 font-medium text-slate-100">
+                      {b.peserta.nama}
+                      {b.sempurna && ' 💎'}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-green-400">
+                      {b.benarSekaliCoba}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-amber-300">
+                      {b.benarSetelahDiperbaiki}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-red-400">
+                      {b.belumBenar}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-slate-400">
+                      {b.soalDijawab}
+                    </td>
+                    <td className="px-2 py-2 text-right font-semibold tabular-nums text-amber-300">
+                      {b.nilai}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-slate-300">
+                      {b.rataNilai === null ? '—' : b.rataNilai}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-slate-400">
+                      {detik(b.rataWaktuMs)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Kartu>
       )}
 

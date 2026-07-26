@@ -36,10 +36,10 @@ export function batasiAlokasi(nilai: number): number {
  */
 export function saldoPribadi(alokasiBisnis: number, mutasi: Mutasi[]): number {
   const awal = MODAL_AWAL - alokasiBisnis
-  return mutasi.reduce(
-    (saldo, m) => saldo + (m.arah === 'prive' ? m.jumlah : -m.jumlah),
-    awal,
-  )
+  return mutasi.reduce((saldo, m) => {
+    const menambah = m.arah === 'prive' || m.arah === 'pribadi_masuk'
+    return saldo + (menambah ? m.jumlah : -m.jumlah)
+  }, awal)
 }
 
 /** Mutasi milik satu peserta saja, dari daftar seluruh peserta. */
@@ -82,4 +82,6 @@ export const OPSI_MUTASI = {
 export const LABEL_MUTASI = {
   topup: 'Top up ke Dompet Bisnis',
   prive: 'Prive ke Dompet Pribadi',
+  pribadi_keluar: 'Belanja pribadi',
+  pribadi_masuk: 'Pemasukan pribadi',
 } as const

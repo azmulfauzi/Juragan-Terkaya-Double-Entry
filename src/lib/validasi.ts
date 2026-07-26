@@ -26,6 +26,16 @@ export function validasiSoal(soal: Soal): string | null {
   if (soal.jenis === 'biasa' && soal.polis)
     return 'Soal biasa tidak boleh punya jenis polis — kosongkan dulu.'
 
+  // Soal pribadi tidak dijurnal sama sekali; jawabannya cukup mengenali bahwa
+  // ini urusan pemilik. Opsi akunnya tetap diperiksa karena peserta yang keliru
+  // memilih ranah bisnis akan tetap disodori pilihan akun.
+  if (soal.sifat === 'pribadi' && !soal.arah_kas)
+    return 'Soal pribadi wajib menyebut arah kasnya (keluar dari atau masuk ke dompet pribadi).'
+  if (soal.sifat === 'bisnis' && soal.arah_kas)
+    return 'Arah kas hanya untuk soal pribadi — kosongkan dulu.'
+  if (soal.sifat === 'pribadi' && soal.jenis !== 'biasa')
+    return 'Soal pribadi hanya berlaku untuk jenis biasa.'
+
   if (soal.opsi_debit.length !== 4) return 'Opsi Debit harus tepat 4 akun.'
   if (soal.opsi_kredit.length !== 4) return 'Opsi Kredit harus tepat 4 akun.'
 

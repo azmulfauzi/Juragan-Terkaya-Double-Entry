@@ -40,6 +40,10 @@ function j(
     diterapkan: true,
     tanpa_jurnal: false,
     jenis: 'soal',
+    percobaan: 1,
+    nilai: 100,
+    sifat_dipilih: 'bisnis',
+    selesai: true,
     created_at: '',
     ...extra,
   }
@@ -126,28 +130,65 @@ const pembukaan = (p: string, nilai = 10_000_000) =>
     // Ani: 2 giliran, dua-duanya benar, kas berkurang karena jujur mencatat.
     j('p1', 1, '1-300', '1-100', 1_000_000, { benar: true }),
     j('p1', 2, '5-300', '1-100', 500_000, { benar: true }),
-    // Budi: 2 giliran, salah semua, kas justru utuh (salah kredit ke Hutang).
-    j('p2', 1, '1-300', '2-100', 1_000_000, { benar: false }),
-    j('p2', 2, '1-300', '2-100', 500_000, { benar: false }),
-    // Cici: jurnal latihan saja — tidak dihitung, tidak diposting.
+    // Budi: 2 giliran, salah sampai habis percobaan — nilainya nol, tapi kas
+    // justru utuh karena salah kredit ke Hutang.
+    j('p2', 1, '1-300', '2-100', 1_000_000, { benar: false, nilai: 0, percobaan: 3 }),
+    j('p2', 2, '1-300', '2-100', 500_000, { benar: false, nilai: 0, percobaan: 3 }),
+    // Cici: warnanya tidak pernah keluar, tapi jawabannya benar. Jurnalnya
+    // tidak diposting — nilainya tetap dihitung penuh.
     j('p3', 1, '1-100', '4-100', 9_000_000, { wajib: false, benar: true, diterapkan: false }),
   ]
 
   const hasil = hitungPeringkat(daftar, jurnal, [])
-  cek('peringkat: ada kandidat sempurna', hasil.adaSempurna, true)
+  cek('peringkat: ada peserta sempurna', hasil.adaSempurna, true)
   cek('peringkat: juara', hasil.baris[0].peserta.nama, 'Ani')
+  cek('peringkat: nilai Ani', hasil.baris[0].nilai, 200)
   cek('peringkat: kas juara lebih kecil dari Budi', hasil.baris[0].saldoKas < 10_000_000, true)
-  cek('peringkat: akurasi Ani', hasil.baris[0].persen, 100)
+
+  // Inti aturan baru: yang tidak pernah kebagian giliran tetap dinilai.
+  const cici = hasil.baris.find((b) => b.peserta.nama === 'Cici')!
+  cek('peringkat: Cici belum pernah kebagian giliran', cici.jumlahWajib, 0)
+  cek('peringkat: nilai latihan Cici tetap dihitung', cici.nilai, 100)
+  cek('peringkat: Cici mengungguli Budi yang salah terus', hasil.baris[1].peserta.nama, 'Cici')
   cek(
-    'peringkat: Cici (latihan saja) belum kebagian',
-    hasil.baris.find((b) => b.peserta.nama === 'Cici')!.persen,
-    null,
-  )
-  cek(
-    'peringkat: Cici di urutan terakhir',
+    'peringkat: Budi di urutan terakhir',
     hasil.baris[hasil.baris.length - 1].peserta.nama,
-    'Cici',
+    'Budi',
   )
+}
+
+// 10. Nilai per percobaan: 100 / 50 / 0
+{
+  const orang = (id: string, nama: string): Peserta => ({
+    id,
+    nama,
+    alokasi_bisnis: 10_000_000,
+    created_at: '',
+  })
+  const daftar = [orang('x', 'Fani'), orang('y', 'Gilang')]
+  const jurnal: Jurnal[] = [
+    pembukaan('x'),
+    pembukaan('y'),
+    // Fani: sekali coba benar, lalu benar di percobaan kedua → 100 + 50
+    j('x', 1, '1-100', '4-100', 1_000_000, { benar: true, nilai: 100, percobaan: 1 }),
+    j('x', 2, '1-100', '4-100', 1_000_000, { benar: true, nilai: 50, percobaan: 2 }),
+    // Gilang: dua-duanya baru benar di percobaan kedua → 50 + 50
+    j('y', 1, '1-100', '4-100', 1_000_000, { benar: true, nilai: 50, percobaan: 2 }),
+    j('y', 2, '1-100', '4-100', 1_000_000, { benar: true, nilai: 50, percobaan: 2 }),
+  ]
+
+  const hasil = hitungPeringkat(daftar, jurnal, [])
+  const fani = hasil.baris.find((b) => b.peserta.nama === 'Fani')!
+  const gilang = hasil.baris.find((b) => b.peserta.nama === 'Gilang')!
+
+  cek('nilai: Fani 100 + 50', fani.nilai, 150)
+  cek('nilai: Gilang 50 + 50', gilang.nilai, 100)
+  cek('nilai: rata-rata Fani', fani.rataNilai, 75)
+  cek('nilai: benar sekali coba Fani', fani.benarSekaliCoba, 1)
+  cek('nilai: benar setelah diperbaiki Fani', fani.benarSetelahDiperbaiki, 1)
+  cek('nilai: Fani sempurna? tidak', fani.sempurna, false)
+  cek('nilai: kekayaan keduanya sama', fani.totalKekayaan === gilang.totalKekayaan, true)
+  cek('nilai: juara ditentukan nilai lebih dulu', hasil.baris[0].peserta.nama, 'Fani')
 }
 
 // 8. Dua dompet: uang pribadi berada di luar pembukuan
@@ -159,6 +200,8 @@ const pembukaan = (p: string, nilai = 10_000_000) =>
     arah,
     jumlah,
     putaran: 1,
+    keterangan: null,
+    soal_id: null,
     created_at: '',
   })
 

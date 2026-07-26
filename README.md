@@ -22,8 +22,9 @@ dengan database yang terpisah.
 
    > Untuk database baru, `schema.sql` saja sudah lengkap. Database lama perlu
    > menjalankan migrasinya berurutan:
-   > [`migrasi-01-asuransi.sql`](supabase/migrasi-01-asuransi.sql) lalu
-   > [`migrasi-02-dua-dompet.sql`](supabase/migrasi-02-dua-dompet.sql).
+   > [`migrasi-01-asuransi.sql`](supabase/migrasi-01-asuransi.sql),
+   > [`migrasi-02-dua-dompet.sql`](supabase/migrasi-02-dua-dompet.sql), lalu
+   > [`migrasi-03-percobaan-dan-ranah.sql`](supabase/migrasi-03-percobaan-dan-ranah.sql).
 3. Buka **Project Settings → Data API**, salin **Project URL** dan **anon key**.
 4. Salin `.env.example` menjadi `.env`, isi kedua nilai tersebut dan tentukan
    `VITE_FASILITATOR_PIN`.
@@ -109,24 +110,58 @@ Di sela putaran (saat menunggu atau setelah reveal), peserta bebas memindahkan u
 - **Prive** bisnis → pribadi, dijurnal `Prive (D) / Kas (K)`
 
 Hanya sisi bisnis yang dijurnal; sisi pribadi cukup mutasi saldo. Perpindahan dibatasi isi dompet
-asalnya, dan **tidak dihitung dalam akurasi** — sama seperti keputusan asuransi.
+asalnya, dan **tidak dihitung dalam nilai** — sama seperti keputusan asuransi.
 
-Uangnya tetap berpindah walaupun jurnalnya salah akun. Tabel `mutasi` menyimpan fakta
-perpindahannya, tabel `jurnal` menyimpan versi catatan peserta. Selisih keduanya justru bahan
-diskusi yang bagus: uang bergerak menurut kenyataan, laporan bergerak menurut catatan.
+**Uang baru berpindah setelah jurnalnya benar.** Peserta yang salah diberi tahu jurnal yang
+seharusnya beserta alasannya, lalu diminta membetulkan sendiri. Berbeda dari jawaban soal yang
+boleh salah lalu dinilai, di sini catatan yang keliru akan membuat Modal atau Prive-nya salah
+sepanjang sisa permainan.
+
+## Menjawab: ranah dulu, baru jurnal
+
+Setiap soal — tanpa kecuali — diawali satu pertanyaan: **ini transaksi bisnis atau pribadi?**
+Kalau pilihan itu hanya muncul di soal pribadi, keberadaannya sendiri sudah membocorkan
+jawabannya.
+
+- **💼 Bisnis** → susun jurnal debit-kredit seperti biasa.
+- **👛 Pribadi** → cukup mutasi Dompet Pribadi dengan keterangan, tanpa jurnal sama sekali.
+
+Sepuluh soal pribadi (skincare, liburan keluarga, servis motor pribadi, dan seterusnya) sengaja
+**tidak menyebut sumber uangnya**. Justru itu ujiannya: mengenali sendiri mana yang urusan pemilik.
+
+## Nilai dan percobaan
+
+Jawaban salah boleh diperbaiki, dan nilainya turun tiap percobaan:
+
+| Percobaan | Nilai |
+|---|---|
+| Benar sekali coba | **100** |
+| Benar di percobaan kedua | **50** |
+| Setelah dua kali salah | **0** — kunci ditunjukkan, peserta tinggal membetulkan catatannya |
+
+Percobaan ketiga memang sudah dituntun, jadi tidak bernilai. Tapi pembukuannya tetap wajib
+dibetulkan: buku yang salah akan menyeret seluruh laporan di putaran berikutnya.
+
+**Jawaban latihan ikut dinilai.** Peserta yang warnanya tidak keluar tetap menjawab dan tetap
+mendapat nilai — hanya jurnalnya saja yang tidak diposting. Karena setiap orang boleh menjawab di
+setiap putaran, jumlah kesempatannya sama rata, sehingga nilai bersih dari pengaruh undian.
+
+Penilaian terjadi di server saat peserta menjawab, dan kunci jawaban baru ikut terkirim setelah
+dua percobaan gagal. Konsekuensinya: tombol **Reveal** tidak lagi "membuka jawaban" — peserta
+sudah tahu hasilnya sendiri. Reveal kini berperan sebagai momen pembahasan bersama.
 
 ## Penentuan pemenang
 
-Akurasi adalah gerbang, kekayaan adalah pemeringkat:
+**Nilai → Total Kekayaan → Kecepatan.**
 
-- Peserta yang **100% jurnalnya benar** menjadi kandidat, diurutkan berdasarkan
-  **Total Kekayaan** = Saldo Kas bisnis + Dompet Pribadi.
-- Kalau tidak ada yang sempurna: persentase benar → jumlah benar → rata-rata waktu → total kekayaan.
-- Akurasi hanya dihitung dari putaran saat peserta berstatus **wajib**.
+Nilai didahulukan karena ia satu-satunya ukuran yang bersih dari keberuntungan. Total Kekayaan
+(Saldo Kas bisnis + Dompet Pribadi) menyusul sebagai pembeda kedua — di situlah undian warna,
+pilihan dompet, dan keputusan asuransi bekerja. Keberuntungan tetap punya tempat, hanya saja
+tidak bisa mengalahkan ketelitian.
 
-Dua dompet dijumlahkan supaya keputusan alokasi di awal jadi taruhan yang sesungguhnya. Kalau
-hanya kas bisnis yang dihitung, semua peserta akan menaruh 10 juta penuh di bisnis dan pilihan
-dompetnya kehilangan makna.
+Tab **📚 Pemahaman** memisahkan sisi ini sepenuhnya: peserta diurutkan dari jumlah jawaban yang
+tepat sejak percobaan pertama, tanpa menyinggung kekayaan sama sekali. Itu bahan evaluasi materi
+setelah sesi.
 
 Kenapa bukan saldo saja: jurnal yang salah tetap diposting, dan kesalahan bisa membuat kas terlihat
 lebih besar. Pembelian tunai yang salah dikreditkan ke Hutang Usaha membuat kas tidak berkurang —
@@ -161,11 +196,12 @@ src/
     versi.ts      Deteksi halaman kedaluwarsa
   components/     Komponen UI, termasuk Pembukuan (5 tab laporan) dan EditorSoal
   pages/          Home, Peserta, Fasilitator
-  data/soal.ts    Bank soal awal (44 transaksi + 6 soal asuransi)
+  data/soal.ts    Bank soal awal (44 transaksi bisnis + 6 asuransi + 10 pribadi)
 supabase/
   schema.sql                Tabel, RLS, realtime, fungsi reset/penilaian/waktu server
   migrasi-01-asuransi.sql   Tambahan mekanik asuransi untuk database lama
   migrasi-02-dua-dompet.sql Tambahan dua dompet untuk database lama
+  migrasi-03-percobaan-dan-ranah.sql  Ranah bisnis/pribadi, percobaan, dan nilai
 uji/              Uji tanpa kerangka tambahan (npm run uji)
 ```
 

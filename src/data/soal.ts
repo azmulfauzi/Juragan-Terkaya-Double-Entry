@@ -669,4 +669,153 @@ export const SOAL_DEFAULT: SoalBenih[] = [
     insight:
       'Perhatikan baik-baik apa yang hilang: yang dinilai di sini adalah muatannya, yaitu Persediaan. Peserta yang otomatis memilih Peralatan karena membaca kata "mobil" akan salah. Selalu tanya dulu: aset mana yang benar-benar berkurang?',
   },
+
+  // ══════════════════ TRANSAKSI PRIBADI (sifat: pribadi) ══════════════════
+  //
+  // Tidak satu pun menyebut sumber uangnya. Justru itu ujiannya: peserta harus
+  // mengenali sendiri bahwa ini urusan pemilik, bukan urusan usaha — uangnya
+  // keluar dari Dompet Pribadi dan tidak ada jurnal yang perlu dibuat.
+  //
+  // Opsi akunnya tetap diisi supaya peserta yang keliru memilih ranah bisnis
+  // tetap bisa menyusun jurnalnya, lalu merasakan sendiri jurnal itu ditolak.
+  {
+    id: 51,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Kamu membeli rangkaian skincare dan perawatan wajah seharga Rp450.000.',
+    nominal: 450_000,
+    opsi_debit: ['3-200', '5-600', '1-400', '5-500'],
+    opsi_kredit: ['1-100', '3-200', '1-110', '2-100'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Skincare tidak dipakai usahamu dan tidak menghasilkan pendapatan apa pun untuknya. Ini pengeluaran pemilik, jadi uangnya keluar dari Dompet Pribadi dan tidak ada jurnal yang perlu dibuat sama sekali. Mencatatnya di buku usaha membuat beban usahamu terlihat lebih besar dari yang sebenarnya.',
+  },
+  {
+    id: 52,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Keluarga berlibur akhir pekan ke luar kota, total pengeluaran Rp1.500.000.',
+    nominal: 1_500_000,
+    opsi_debit: ['3-200', '5-500', '5-600', '1-400'],
+    opsi_kredit: ['1-100', '3-200', '1-110', '2-100'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Liburan keluarga jelas bukan kegiatan usaha. Selama uangnya dari kantong pribadi, buku usahamu tidak perlu tahu sama sekali — cukup catat di Dompet Pribadi supaya kamu tetap tahu ke mana perginya uangmu.',
+  },
+  {
+    id: 53,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Servis rutin motor pribadi yang dipakai sehari-hari keluarga, Rp250.000.',
+    nominal: 250_000,
+    opsi_debit: ['3-200', '5-500', '5-600', '1-500'],
+    opsi_kredit: ['1-100', '3-200', '1-110', '2-100'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Perhatikan kata "pribadi". Motor operasional yang dipakai mengantar pesanan biayanya masuk Beban Transportasi usaha; motor keluarga tidak. Aset yang sama bisa berbeda perlakuannya tergantung siapa yang memakainya.',
+  },
+  {
+    id: 54,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Membeli baju lebaran untuk anak-anak senilai Rp800.000.',
+    nominal: 800_000,
+    opsi_debit: ['3-200', '1-300', '5-600', '5-200'],
+    opsi_kredit: ['1-100', '3-200', '1-110', '4-100'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Godaannya mencatat ini sebagai Persediaan karena berupa barang. Tapi persediaan adalah barang untuk DIJUAL; baju yang dipakai keluarga sendiri tidak akan pernah menghasilkan pendapatan.',
+  },
+  {
+    id: 55,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Menghadiri kondangan dan memberi amplop Rp300.000.',
+    nominal: 300_000,
+    opsi_debit: ['3-200', '5-600', '5-500', '1-400'],
+    opsi_kredit: ['1-100', '3-200', '2-100', '1-110'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Beban Lain-lain milik usaha hanya untuk pengeluaran yang tetap ada hubungannya dengan usaha, seperti iuran keamanan pasar. Amplop kondangan tetangga bukan salah satunya.',
+  },
+  {
+    id: 56,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Membayar langganan layanan streaming dan internet rumah Rp200.000.',
+    nominal: 200_000,
+    opsi_debit: ['3-200', '5-400', '5-600', '1-400'],
+    opsi_kredit: ['1-100', '3-200', '1-110', '2-100'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Sekali lagi jebakan kata: ada "internet" dan "langganan", terdengar seperti biaya operasional. Tapi yang menikmati adalah keluarga di rumah, bukan kios. Yang menentukan bukan jenis tagihannya, melainkan siapa yang memetik manfaatnya.',
+  },
+  {
+    id: 57,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Membelikan anak ponsel baru untuk sekolah seharga Rp2.000.000.',
+    nominal: 2_000_000,
+    opsi_debit: ['3-200', '1-500', '1-400', '5-600'],
+    opsi_kredit: ['1-100', '3-200', '2-100', '1-110'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Nominalnya besar dan barangnya awet, jadi terasa pantas masuk Peralatan. Tapi Peralatan hanya untuk aset yang dipakai usaha. Ponsel anak sekolah tidak pernah menghasilkan rupiah untuk kiosmu.',
+  },
+  {
+    id: 58,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Membayar iuran keanggotaan gym bulanan Rp350.000.',
+    nominal: 350_000,
+    opsi_debit: ['3-200', '5-600', '5-200', '1-400'],
+    opsi_kredit: ['1-100', '3-200', '1-110', '2-100'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Kesehatan pemilik memang menopang usahanya, tapi akuntansi tidak mengakui hubungan sejauh itu. Kalau logika "toh akhirnya untuk usaha juga" diterima, hampir semua pengeluaran pribadi bisa dibenarkan masuk buku usaha.',
+  },
+  {
+    id: 59,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Memanggil teknisi untuk servis AC rumah, biayanya Rp400.000.',
+    nominal: 400_000,
+    opsi_debit: ['3-200', '5-400', '5-600', '1-500'],
+    opsi_kredit: ['1-100', '3-200', '1-110', '2-100'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Bandingkan dengan servis peralatan kios yang memang beban usaha. Yang membedakan cuma satu: barangnya ada di rumah atau di tempat usaha.',
+  },
+  {
+    id: 60,
+    kategori: 'modal',
+    sifat: 'pribadi',
+    arah_kas: 'keluar',
+    teks: 'Mentraktir teman-teman saat reuni sekolah, habis Rp600.000.',
+    nominal: 600_000,
+    opsi_debit: ['3-200', '5-600', '5-500', '1-300'],
+    opsi_kredit: ['1-100', '3-200', '2-100', '1-110'],
+    debit_benar: '3-200',
+    kredit_benar: '1-100',
+    insight:
+      'Kalau yang ditraktir adalah pemasok atau pelanggan dalam rangka usaha, ia bisa jadi beban usaha. Reuni sekolah murni urusan pribadi. Niat di balik pengeluaran itulah yang menentukan tempatnya.',
+  },
 ]

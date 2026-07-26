@@ -13,7 +13,13 @@ import type { KategoriSoal, Polis, Soal } from '../src/lib/types'
 export let gagal = 0
 
 /** Benih boleh menghilangkan jenis/polis; di sini dilengkapi seperti saat disimpan. */
-const SOAL: Soal[] = SOAL_DEFAULT.map((s) => ({ jenis: 'biasa', polis: null, ...s }))
+const SOAL: Soal[] = SOAL_DEFAULT.map((s) => ({
+  jenis: 'biasa',
+  polis: null,
+  sifat: 'bisnis',
+  arah_kas: null,
+  ...s,
+}))
 
 // 1. Setiap soal wajib lolos validasi editor.
 for (const s of SOAL) {
@@ -49,9 +55,10 @@ for (const s of SOAL) {
 }
 
 // 5. Sebaran kategori & porsi Prive.
-//    Dihitung dari soal 'biasa' saja — hanya merekalah yang ikut undian acak,
-//    jadi hanya komposisi merekalah yang menentukan adil-tidaknya permainan.
-const biasa = SOAL.filter((s) => s.jenis === 'biasa')
+//    Dihitung dari soal transaksi BISNIS yang ikut undian acak saja. Soal
+//    pribadi tidak menyentuh kas usaha sama sekali, jadi memasukkannya ke
+//    hitungan ini hanya membuat sebarannya terlihat timpang tanpa sebab.
+const biasa = SOAL.filter((s) => s.jenis === 'biasa' && s.sifat === 'bisnis')
 const hitung: Record<KategoriSoal, number> = {
   kas_masuk: 0,
   kas_keluar: 0,
@@ -59,7 +66,23 @@ const hitung: Record<KategoriSoal, number> = {
   modal: 0,
 }
 for (const s of biasa) hitung[s.kategori]++
-console.log(`Soal biasa (ikut undian acak): ${biasa.length} dari ${SOAL.length}`)
+const pribadi = SOAL.filter((s) => s.sifat === 'pribadi')
+console.log(`Soal bisnis yang diundi acak: ${biasa.length} dari ${SOAL.length}`)
+console.log(`Soal pribadi: ${pribadi.length}`)
+
+// Porsi soal pribadi harus cukup terasa. Kalau terlalu sedikit, pilihan
+// "bisnis atau pribadi" di setiap soal jadi basa-basi yang selalu dijawab
+// "bisnis" tanpa berpikir.
+if (pribadi.length < 8) {
+  gagal++
+  console.log('GAGAL: soal pribadi terlalu sedikit — pilihan ranahnya jadi basa-basi')
+}
+for (const s of pribadi) {
+  if (!s.arah_kas) {
+    gagal++
+    console.log(`GAGAL soal #${s.id}: soal pribadi tanpa arah kas`)
+  }
+}
 console.log('Sebaran kategori:', hitung)
 
 const prive = biasa.filter((s) => s.debit_benar === '3-200').length
