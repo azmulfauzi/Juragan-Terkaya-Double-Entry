@@ -40,15 +40,10 @@ export type Polis = 'kebakaran' | 'kendaraan'
 export type Sifat = 'bisnis' | 'pribadi'
 
 /**
- * Nilai satu jawaban, ditentukan percobaan keberapa peserta menjawab benar.
- * Setelah dua kali salah, sistem menunjukkan kuncinya — jawaban ketiga memang
- * sudah dituntun, jadi tidak bernilai.
+ * Nilai satu jawaban. Peserta hanya punya SATU kesempatan, dan hasilnya baru
+ * dibuka saat fasilitator reveal — jadi tidak ada tawar-menawar di tengah jalan.
  */
-export const NILAI_PER_PERCOBAAN = [100, 50, 0] as const
-
-export function nilaiPercobaan(percobaan: number): number {
-  return NILAI_PER_PERCOBAAN[Math.min(percobaan, 3) - 1] ?? 0
-}
+export const NILAI_BENAR = 100
 
 export interface GameState {
   id: number
@@ -132,10 +127,12 @@ export interface Jurnal {
    * mutasi    : top up atau prive antar dompet, boleh berkali-kali per putaran
    */
   jenis: 'soal' | 'pembukaan' | 'mutasi'
-  /** Percobaan keberapa jawaban ini diselesaikan (1, 2, atau 3). */
+  /** Sisa dari aturan lama; sekarang selalu 1. */
   percobaan: number
-  /** 100 / 50 / 0 sesuai percobaan. Dihitung juga untuk jurnal latihan. */
+  /** 100 bila benar, 0 bila salah. Dihitung juga untuk jurnal latihan. */
   nilai: number
+  /** Sudah dibetulkan peserta setelah reveal. Nilainya tetap 0. */
+  diperbaiki: boolean
   /** Ranah yang dipilih peserta — salah memilih pun dihitung sebagai percobaan. */
   sifat_dipilih: Sifat | null
   /** true bila jawaban sudah final: benar, atau habis tiga percobaan. */
@@ -191,21 +188,9 @@ export type SoalTanpaKunci = Pick<
   'id' | 'kategori' | 'jenis' | 'polis' | 'teks' | 'nominal' | 'opsi_debit' | 'opsi_kredit'
 >
 
-/**
- * Balasan server atas satu percobaan jawaban.
- * `kunci*` hanya terisi setelah dua percobaan gagal — sebelum itu, kunci
- * jawaban memang tidak pernah dikirim ke perangkat peserta.
- */
-export interface HasilPercobaan {
-  benar: boolean
-  percobaan: number
-  nilai: number
-  /** true bila jawaban ini sudah final: benar, atau percobaan ketiga. */
-  selesai: boolean
-  kunci_sifat: Sifat | null
-  kunci_debit: string | null
-  kunci_kredit: string | null
-  insight: string | null
+export interface HasilPerbaikan {
+  ok: boolean
+  pesan: string
 }
 
 /**

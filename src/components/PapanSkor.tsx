@@ -29,8 +29,8 @@ export default function PapanSkor({ hasil, sorotPesertaId, batas }: Props) {
       <p className="mb-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-[11px] leading-relaxed text-cyan-200">
         Urutannya: <b>Nilai → Total Kekayaan → Kecepatan</b>. Nilai dihitung dari semua jawaban,
         termasuk latihan — jadi peserta yang warnanya tidak pernah keluar tetap bisa juara lewat
-        pemahamannya. 100 bila tepat sekali coba, 50 bila benar di percobaan kedua, 0 setelahnya.
-        {hasil.adaSempurna && ' 💎 menandai yang seluruh jawabannya tepat sejak percobaan pertama.'}
+        pemahamannya. Satu kesempatan per soal: 100 bila benar, 0 bila salah.
+        {hasil.adaSempurna && ' 💎 menandai yang seluruh jawabannya benar.'}
       </p>
 
       <div className="scroll-x">

@@ -23,8 +23,9 @@ dengan database yang terpisah.
    > Untuk database baru, `schema.sql` saja sudah lengkap. Database lama perlu
    > menjalankan migrasinya berurutan:
    > [`migrasi-01-asuransi.sql`](supabase/migrasi-01-asuransi.sql),
-   > [`migrasi-02-dua-dompet.sql`](supabase/migrasi-02-dua-dompet.sql), lalu
-   > [`migrasi-03-percobaan-dan-ranah.sql`](supabase/migrasi-03-percobaan-dan-ranah.sql).
+   > [`migrasi-02-dua-dompet.sql`](supabase/migrasi-02-dua-dompet.sql),
+   > [`migrasi-03-percobaan-dan-ranah.sql`](supabase/migrasi-03-percobaan-dan-ranah.sql), lalu
+   > [`migrasi-04-satu-kesempatan.sql`](supabase/migrasi-04-satu-kesempatan.sql).
 3. Buka **Project Settings → Data API**, salin **Project URL** dan **anon key**.
 4. Salin `.env.example` menjadi `.env`, isi kedua nilai tersebut dan tentukan
    `VITE_FASILITATOR_PIN`.
@@ -129,26 +130,23 @@ jawabannya.
 Sepuluh soal pribadi (skincare, liburan keluarga, servis motor pribadi, dan seterusnya) sengaja
 **tidak menyebut sumber uangnya**. Justru itu ujiannya: mengenali sendiri mana yang urusan pemilik.
 
-## Nilai dan percobaan
+## Nilai
 
-Jawaban salah boleh diperbaiki, dan nilainya turun tiap percobaan:
+**Satu kesempatan per soal.** Begitu terkirim, jawaban terkunci dan hasilnya tidak diberitahukan —
+benar atau salah baru terbuka setelah fasilitator menekan **Reveal**. Nilainya **100 bila benar,
+0 bila salah**.
 
-| Percobaan | Nilai |
-|---|---|
-| Benar sekali coba | **100** |
-| Benar di percobaan kedua | **50** |
-| Setelah dua kali salah | **0** — kunci ditunjukkan, peserta tinggal membetulkan catatannya |
-
-Percobaan ketiga memang sudah dituntun, jadi tidak bernilai. Tapi pembukuannya tetap wajib
-dibetulkan: buku yang salah akan menyeret seluruh laporan di putaran berikutnya.
+Setelah reveal, peserta melihat jawabannya sendiri disandingkan dengan jawaban yang benar beserta
+insight-nya. Yang salah diminta menekan **🛠️ Betulkan pembukuanku** — nilainya tetap 0, yang
+dibetulkan adalah pembukuannya. Buku yang salah akan menyeret seluruh laporan di putaran
+berikutnya, dan itu jauh lebih merugikan peserta daripada kehilangan seratus poin.
 
 **Jawaban latihan ikut dinilai.** Peserta yang warnanya tidak keluar tetap menjawab dan tetap
 mendapat nilai — hanya jurnalnya saja yang tidak diposting. Karena setiap orang boleh menjawab di
 setiap putaran, jumlah kesempatannya sama rata, sehingga nilai bersih dari pengaruh undian.
 
-Penilaian terjadi di server saat peserta menjawab, dan kunci jawaban baru ikut terkirim setelah
-dua percobaan gagal. Konsekuensinya: tombol **Reveal** tidak lagi "membuka jawaban" — peserta
-sudah tahu hasilnya sendiri. Reveal kini berperan sebagai momen pembahasan bersama.
+Penilaian dilakukan di server saat reveal, bukan di browser peserta. Kunci jawaban tidak pernah
+dikirim ke perangkat peserta selama putaran berjalan.
 
 ## Penentuan pemenang
 
@@ -201,7 +199,8 @@ supabase/
   schema.sql                Tabel, RLS, realtime, fungsi reset/penilaian/waktu server
   migrasi-01-asuransi.sql   Tambahan mekanik asuransi untuk database lama
   migrasi-02-dua-dompet.sql Tambahan dua dompet untuk database lama
-  migrasi-03-percobaan-dan-ranah.sql  Ranah bisnis/pribadi, percobaan, dan nilai
+  migrasi-03-percobaan-dan-ranah.sql  Ranah bisnis/pribadi dan nilai
+  migrasi-04-satu-kesempatan.sql      Satu kesempatan, hasil dibuka saat reveal
 uji/              Uji tanpa kerangka tambahan (npm run uji)
 ```
 

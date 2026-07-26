@@ -4,7 +4,7 @@ import { JURNAL_MUTASI, batasiAlokasi } from './dompet'
 import { validasiSoal } from './validasi'
 import type {
   GameState,
-  HasilPercobaan,
+  HasilPerbaikan,
   Jurnal,
   Keputusan,
   Mutasi,
@@ -130,6 +130,12 @@ export interface JurnalBaru {
   waktu_jawab_ms: number | null
   /** true bila peserta menyatakan tidak ada jurnal yang perlu dicatat. */
   tanpa_jurnal?: boolean
+  /**
+   * Ranah yang dipilih peserta. Kolom benar dan nilai sengaja TIDAK dikirim
+   * dari sini — server yang menilainya saat reveal, supaya hasilnya tidak bisa
+   * dibaca lebih awal lewat devtools.
+   */
+  sifat_dipilih?: Sifat | null
 }
 
 /**
@@ -287,32 +293,21 @@ export function polisAktif(keputusan: Keputusan[]): Set<Polis> {
 const KOLOM_TANPA_KUNCI = 'id, kategori, jenis, polis, teks, nominal, opsi_debit, opsi_kredit'
 
 /**
- * Mengirim satu percobaan jawaban dan menerima hasilnya seketika.
+ * Membetulkan jurnal yang salah, setelah fasilitator reveal.
  *
- * Penilaian dilakukan di server, dan kunci jawaban baru ikut terkirim setelah
- * dua percobaan gagal. Sebelum itu, perangkat peserta memang tidak pernah
- * memegang jawabannya — memindahkan pemeriksaan ini ke browser akan membuat
- * kuncinya bisa dibaca lewat devtools sejak soal muncul.
+ * Nilainya tetap 0 — yang dibetulkan adalah pembukuannya. Server menolak
+ * memanggil ini sebelum reveal, supaya tidak jadi jalan pintas mengintip kunci
+ * jawaban di tengah putaran.
  */
-export async function cobaJawab(param: {
-  pesertaId: string
-  putaran: number
-  sifat: Sifat
-  akunDebit?: string | null
-  akunKredit?: string | null
-  tanpaJurnal?: boolean
-  waktuMs?: number | null
-}): Promise<HasilPercobaan> {
-  const { data, error } = await supabase.rpc('coba_jawab', {
-    p_peserta: param.pesertaId,
-    p_putaran: param.putaran,
-    p_sifat: param.sifat,
-    p_debit: param.akunDebit ?? null,
-    p_kredit: param.akunKredit ?? null,
-    p_tanpa_jurnal: param.tanpaJurnal ?? false,
-    p_waktu_ms: param.waktuMs ?? null,
+export async function perbaikiJawaban(
+  pesertaId: string,
+  putaran: number,
+): Promise<HasilPerbaikan> {
+  const { data, error } = await supabase.rpc('perbaiki_jawaban', {
+    p_peserta: pesertaId,
+    p_putaran: putaran,
   })
-  return cek(data as HasilPercobaan | null, error, 'Gagal mengirim jawaban')
+  return cek(data as HasilPerbaikan | null, error, 'Gagal membetulkan jurnal')
 }
 
 /**

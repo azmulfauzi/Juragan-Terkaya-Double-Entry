@@ -38,11 +38,11 @@ export interface StatPeserta {
   nilai: number
   /** Berapa soal yang dijawab sampai final (benar maupun habis percobaan). */
   soalDijawab: number
-  /** Benar sejak percobaan pertama (100 poin). */
+  /** Jawaban tepat (100 poin). */
   benarSekaliCoba: number
-  /** Benar pada percobaan kedua (50 poin). */
+  /** Salah, tapi pembukuannya sudah dibetulkan setelah reveal. Tetap 0 poin. */
   benarSetelahDiperbaiki: number
-  /** Habis tiga percobaan atau tidak menjawab (0 poin). */
+  /** Salah dan belum dibetulkan, atau tidak menjawab sama sekali. */
   belumBenar: number
   /** Rata-rata poin per soal yang dijawab, 0–100. */
   rataNilai: number | null
@@ -135,9 +135,9 @@ export function hitungPeringkat(
       rataWaktuMs: waktu.length > 0 ? waktu.reduce((t, w) => t + w, 0) / waktu.length : null,
       nilai,
       soalDijawab,
-      benarSekaliCoba: semuaJawaban.filter((j) => j.nilai === 100).length,
-      benarSetelahDiperbaiki: semuaJawaban.filter((j) => j.nilai === 50).length,
-      belumBenar: semuaJawaban.filter((j) => (j.nilai ?? 0) === 0).length,
+      benarSekaliCoba: semuaJawaban.filter((j) => j.benar).length,
+      benarSetelahDiperbaiki: semuaJawaban.filter((j) => !j.benar && j.diperbaiki).length,
+      belumBenar: semuaJawaban.filter((j) => !j.benar && !j.diperbaiki).length,
       rataNilai: soalDijawab > 0 ? Math.round(nilai / soalDijawab) : null,
       sempurna: soalDijawab > 0 && nilai === soalDijawab * 100,
     }

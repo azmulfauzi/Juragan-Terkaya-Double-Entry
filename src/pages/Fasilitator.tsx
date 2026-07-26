@@ -765,9 +765,11 @@ function Dashboard() {
             Sejauh mana peserta memahami materi
           </p>
           <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
-            Diurutkan dari jumlah jawaban yang tepat sejak percobaan pertama. Tabel ini bersih dari
-            keberuntungan: jawaban latihan ikut dihitung, jadi peserta yang warnanya jarang keluar
-            tetap terlihat pemahamannya. Pakai ini untuk menilai materi mana yang perlu diulang.
+            Diurutkan dari jumlah jawaban yang benar. Tabel ini bersih dari keberuntungan: jawaban
+            latihan ikut dihitung, jadi peserta yang warnanya jarang keluar tetap terlihat
+            pemahamannya. Kolom 🛠️ Dibetulkan berisi jawaban salah yang pembukuannya sudah
+            diperbaiki peserta setelah reveal — nilainya tetap 0. Pakai tabel ini untuk menilai
+            materi mana yang perlu diulang.
           </p>
           <div className="scroll-x">
             <table className="w-full min-w-[620px] text-xs">
@@ -775,9 +777,9 @@ function Dashboard() {
                 <tr className="text-slate-400">
                   <th className="px-2 py-1.5 text-left font-medium">#</th>
                   <th className="px-2 py-1.5 text-left font-medium">Nama</th>
-                  <th className="px-2 py-1.5 text-right font-medium">✅ Sekali coba</th>
-                  <th className="px-2 py-1.5 text-right font-medium">🔁 Setelah diperbaiki</th>
-                  <th className="px-2 py-1.5 text-right font-medium">❌ Belum benar</th>
+                  <th className="px-2 py-1.5 text-right font-medium">✅ Benar</th>
+                  <th className="px-2 py-1.5 text-right font-medium">🛠️ Dibetulkan</th>
+                  <th className="px-2 py-1.5 text-right font-medium">❌ Salah</th>
                   <th className="px-2 py-1.5 text-right font-medium">Dijawab</th>
                   <th className="px-2 py-1.5 text-right font-medium">Nilai</th>
                   <th className="px-2 py-1.5 text-right font-medium">Rata Nilai</th>

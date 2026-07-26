@@ -44,6 +44,7 @@ function j(
     nilai: 100,
     sifat_dipilih: 'bisnis',
     selesai: true,
+    diperbaiki: false,
     created_at: '',
     ...extra,
   }
@@ -157,7 +158,7 @@ const pembukaan = (p: string, nilai = 10_000_000) =>
   )
 }
 
-// 10. Nilai per percobaan: 100 / 50 / 0
+// 10. Nilai 100 / 0 — satu kesempatan menjawab
 {
   const orang = (id: string, nama: string): Peserta => ({
     id,
@@ -169,24 +170,32 @@ const pembukaan = (p: string, nilai = 10_000_000) =>
   const jurnal: Jurnal[] = [
     pembukaan('x'),
     pembukaan('y'),
-    // Fani: sekali coba benar, lalu benar di percobaan kedua → 100 + 50
-    j('x', 1, '1-100', '4-100', 1_000_000, { benar: true, nilai: 100, percobaan: 1 }),
-    j('x', 2, '1-100', '4-100', 1_000_000, { benar: true, nilai: 50, percobaan: 2 }),
-    // Gilang: dua-duanya baru benar di percobaan kedua → 50 + 50
-    j('y', 1, '1-100', '4-100', 1_000_000, { benar: true, nilai: 50, percobaan: 2 }),
-    j('y', 2, '1-100', '4-100', 1_000_000, { benar: true, nilai: 50, percobaan: 2 }),
+    // Fani: dua-duanya benar → 200
+    j('x', 1, '1-100', '4-100', 1_000_000, { benar: true, nilai: 100 }),
+    j('x', 2, '1-100', '4-100', 1_000_000, { benar: true, nilai: 100 }),
+    // Gilang: satu benar, satu salah lalu dibetulkan setelah reveal.
+    // Jurnalnya jadi benar dan tetap diposting, tapi nilainya tetap 0.
+    j('y', 1, '1-100', '4-100', 1_000_000, { benar: true, nilai: 100 }),
+    j('y', 2, '1-100', '4-100', 1_000_000, {
+      benar: false,
+      nilai: 0,
+      diperbaiki: true,
+      diterapkan: true,
+    }),
   ]
 
   const hasil = hitungPeringkat(daftar, jurnal, [])
   const fani = hasil.baris.find((b) => b.peserta.nama === 'Fani')!
   const gilang = hasil.baris.find((b) => b.peserta.nama === 'Gilang')!
 
-  cek('nilai: Fani 100 + 50', fani.nilai, 150)
-  cek('nilai: Gilang 50 + 50', gilang.nilai, 100)
-  cek('nilai: rata-rata Fani', fani.rataNilai, 75)
-  cek('nilai: benar sekali coba Fani', fani.benarSekaliCoba, 1)
-  cek('nilai: benar setelah diperbaiki Fani', fani.benarSetelahDiperbaiki, 1)
-  cek('nilai: Fani sempurna? tidak', fani.sempurna, false)
+  cek('nilai: Fani 100 + 100', fani.nilai, 200)
+  cek('nilai: Gilang 100 + 0 walau sudah dibetulkan', gilang.nilai, 100)
+  cek('nilai: rata-rata Gilang', gilang.rataNilai, 50)
+  cek('nilai: benar sekali coba Gilang', gilang.benarSekaliCoba, 1)
+  cek('nilai: Fani sempurna', fani.sempurna, true)
+  cek('nilai: Gilang tidak sempurna', gilang.sempurna, false)
+  // Pembetulan tetap memperbaiki pembukuan walau nilainya nol.
+  cek('nilai: kas Gilang ikut terkoreksi', gilang.saldoKas, 12_000_000)
   cek('nilai: kekayaan keduanya sama', fani.totalKekayaan === gilang.totalKekayaan, true)
   cek('nilai: juara ditentukan nilai lebih dulu', hasil.baris[0].peserta.nama, 'Fani')
 }

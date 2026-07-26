@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useEffect,
   useMemo,
@@ -11,7 +11,6 @@ import { Link } from 'react-router-dom'
 import BannerVersi from '../components/BannerVersi'
 import Dompet from '../components/Dompet'
 import Pembukuan from '../components/Pembukuan'
-import SpinWheel from '../components/SpinWheel'
 import TimerRing from '../components/TimerRing'
 import {
   ambilJudulSoal,
@@ -22,8 +21,8 @@ import {
   ambilPilihanWarnaSaya,
   ambilSoalLengkap,
   ambilSoalTanpaKunci,
-  cobaJawab,
   daftarPeserta,
+  perbaikiJawaban,
   polisAktif,
   simpanJurnal,
   simpanKeputusan,
@@ -52,7 +51,6 @@ import { susunPembukuan } from '../lib/laporan'
 import { lamaJawabMs } from '../lib/waktu'
 import { useVersiKedaluwarsa } from '../lib/versi'
 import type {
-  HasilPercobaan,
   Jurnal,
   Keputusan,
   Mutasi,
@@ -618,6 +616,20 @@ function FaseKeputusan({
     }
   }
 
+  /** Membetulkan jurnal premi setelah reveal. Nilainya tetap 0. */
+  async function perbaiki() {
+    setSibuk(true)
+    try {
+      const h = await perbaikiJawaban(pesertaId, putaran)
+      if (!h.ok) onGalat(h.pesan)
+      onTerkirim()
+    } catch (e) {
+      onGalat(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSibuk(false)
+    }
+  }
+
   async function beliDanJurnal() {
     if (!soal?.polis || !debit || !kredit) return
     setSibuk(true)
@@ -777,17 +789,34 @@ function FaseKeputusan({
           </div>
 
           {membeli && jurnalSaya && (
-            <p
-              className={`mt-3 rounded-lg border px-3 py-2 text-xs font-semibold ${
-                jurnalSaya.benar
-                  ? 'border-green-500/40 bg-green-500/10 text-green-300'
-                  : 'border-red-500/40 bg-red-500/10 text-red-200'
-              }`}
-            >
-              {jurnalSaya.benar
-                ? '✅ Jurnalmu benar dan sudah dibukukan.'
-                : `❌ Jurnalmu belum tepat — seharusnya ${namaAkun(soalLengkap.debit_benar)} (D) / ${namaAkun(soalLengkap.kredit_benar)} (K). Jurnalmu tetap dibukukan apa adanya, tapi polismu tetap aktif.`}
-            </p>
+            <div className="mt-3">
+              {jurnalSaya.benar ? (
+                <p className="rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-xs font-semibold text-green-300">
+                  ✅ Jurnalmu tepat — nilai 100, dan preminya sudah dibukukan.
+                </p>
+              ) : (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  <p className="font-semibold">❌ Jurnalmu belum tepat — nilai 0.</p>
+                  <p className="mt-1">
+                    Seharusnya {namaAkun(soalLengkap.debit_benar)} (D) /{' '}
+                    {namaAkun(soalLengkap.kredit_benar)} (K). Polismu tetap aktif.
+                  </p>
+                  {jurnalSaya.diperbaiki ? (
+                    <p className="mt-2 font-semibold text-green-300">
+                      ✅ Pembukuanmu sudah dibetulkan.
+                    </p>
+                  ) : (
+                    <button
+                      onClick={perbaiki}
+                      disabled={sibuk}
+                      className="mt-2 w-full rounded-lg bg-sky-600 py-2.5 text-sm font-bold text-white transition hover:bg-sky-500 active:scale-[.98] disabled:opacity-40"
+                    >
+                      {sibuk ? 'Membetulkan…' : '🛠️ Betulkan pembukuanku'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {showInsight && soalLengkap.insight && (
@@ -841,19 +870,13 @@ function FaseMenjurnal({
   const [debit, setDebit] = useState<string | null>(null)
   const [kredit, setKredit] = useState<string | null>(null)
   const [sibuk, setSibuk] = useState(false)
-  const [hasil, setHasil] = useState<HasilPercobaan | null>(null)
   const musibah = soal?.jenis === 'kejadian'
 
   const habis = sisa === 0
-  // Sumber kebenaran ada di server; state lokal hanya cerminan jawaban terakhir.
-  // Kalau peserta memuat ulang halaman di tengah putaran, jurnalSaya-lah yang
-  // memberitahu sudah berapa kali ia mencoba.
-  const percobaanTerpakai = hasil?.percobaan ?? jurnalSaya?.percobaan ?? 0
-  const selesai = hasil?.selesai ?? jurnalSaya?.selesai ?? false
-  const gagalTerakhir = Boolean(hasil && !hasil.benar && !hasil.selesai)
-  // Setelah dua percobaan gagal, kunci ditunjukkan dan peserta tinggal
-  // membetulkan catatannya — supaya pembukuannya tetap berakhir benar.
-  const dipandu = gagalTerakhir && hasil?.kunci_sifat != null
+  // Satu kesempatan saja. Begitu terkirim, pilihannya terkunci dan hasilnya
+  // baru dibuka setelah fasilitator reveal — persis seperti rancangan semula,
+  // supaya tidak ada peserta yang tahu duluan.
+  const sudahKirim = Boolean(jurnalSaya)
 
   // Urutan opsi diacak per peserta agar tidak bisa saling contek posisi, tapi
   // tetap stabil selama putaran ini supaya tombolnya tidak bergeser saat disentuh.
@@ -875,23 +898,18 @@ function FaseMenjurnal({
     if (!soal) return
     setSibuk(true)
     try {
-      const h = await cobaJawab({
-        pesertaId,
+      await simpanJurnal({
+        peserta_id: pesertaId,
         putaran,
-        sifat: opsi.sifat,
-        akunDebit: opsi.debit ?? null,
-        akunKredit: opsi.kredit ?? null,
-        tanpaJurnal: opsi.tanpaJurnal ?? false,
-        waktuMs: lamaJawabMs(faseMulai),
+        soal_id: soal.id,
+        akun_debit: opsi.debit ?? null,
+        akun_kredit: opsi.kredit ?? null,
+        nominal: soal.nominal,
+        wajib,
+        waktu_jawab_ms: lamaJawabMs(faseMulai),
+        tanpa_jurnal: opsi.tanpaJurnal ?? false,
+        sifat_dipilih: opsi.sifat,
       })
-      setHasil(h)
-      if (!h.benar && !h.selesai) {
-        // Bersihkan pilihan supaya peserta benar-benar menimbang ulang,
-        // bukan sekadar menekan kirim untuk kedua kalinya.
-        setRanah(null)
-        setDebit(null)
-        setKredit(null)
-      }
       onTerkirim()
     } catch (e) {
       onGalat(e instanceof Error ? e.message : String(e))
@@ -900,15 +918,18 @@ function FaseMenjurnal({
     }
   }
 
-  /** Menyalin kunci yang sudah ditunjukkan, lalu mengirimnya sebagai jawaban akhir. */
-  async function kirimPanduan() {
-    if (!hasil?.kunci_sifat) return
-    await kirim({
-      sifat: hasil.kunci_sifat,
-      debit: hasil.kunci_debit,
-      kredit: hasil.kunci_kredit,
-      tanpaJurnal: hasil.kunci_sifat === 'bisnis' && !hasil.kunci_debit,
-    })
+  /** Membetulkan pembukuan setelah reveal. Nilainya tetap 0. */
+  async function perbaiki() {
+    setSibuk(true)
+    try {
+      const h = await perbaikiJawaban(pesertaId, putaran)
+      if (!h.ok) onGalat(h.pesan)
+      onTerkirim()
+    } catch (e) {
+      onGalat(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSibuk(false)
+    }
   }
 
   if (!soal) {
@@ -921,25 +942,25 @@ function FaseMenjurnal({
 
   return (
     <div className="space-y-3">
-      {/* Hasil roda — peserta remote harus melihatnya di HP-nya sendiri */}
-      <Kartu>
-        <div className="flex flex-col items-center">
-          <SpinWheel hasil={warnaSpin} pemicu={putaran} ukuran={180} />
-          <div
-            className={`mt-2 rounded-xl border px-4 py-2 text-center text-sm font-bold ${
-              wajib
-                ? 'border-amber-400 bg-amber-500/15 text-amber-200'
-                : 'border-slate-600 bg-slate-900/60 text-slate-300'
-            }`}
-          >
-            {wajib ? '🎯 Kamu WAJIB menjurnal' : '📝 Latihan (tidak diposting)'}
-          </div>
-          <p className="mt-1 text-[11px] text-slate-400">
-            Warnamu {warnaSaya ? WARNA_META[warnaSaya].emoji : '—'} · Roda berhenti di{' '}
-            {warnaSpin ? WARNA_META[warnaSpin].emoji : '—'}
-          </p>
-        </div>
-      </Kartu>
+      {/* Hasil roda dalam bentuk ringkas.
+          Rodanya sendiri hanya tampil di layar fasilitator: di HP peserta ia
+          memakan hampir separuh layar padahal putarannya sudah selesai, dan
+          mendorong kartu kasus jauh ke bawah. */}
+      <div
+        className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-2.5 ${
+          wajib
+            ? 'border-amber-400 bg-amber-500/15'
+            : 'border-slate-700 bg-slate-800/60'
+        }`}
+      >
+        <span className={`text-sm font-bold ${wajib ? 'text-amber-200' : 'text-slate-300'}`}>
+          {wajib ? '🎯 Giliranmu menjurnal' : '📝 Latihan (tidak diposting)'}
+        </span>
+        <span className="shrink-0 text-[11px] text-slate-400">
+          Warnamu {warnaSaya ? WARNA_META[warnaSaya].emoji : '—'} · Roda{' '}
+          {warnaSpin ? WARNA_META[warnaSpin].emoji : '—'}
+        </span>
+      </div>
 
       {/* Kasus */}
       <Kartu>
@@ -968,32 +989,37 @@ function FaseMenjurnal({
           </div>
         )}
 
-        {/* Umpan balik percobaan yang gagal */}
-        {gagalTerakhir && !dipandu && (
-          <div className="animasi-muncul mb-3 rounded-xl border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-            <p className="font-semibold">
-              ❌ Belum tepat. Percobaan {percobaanTerpakai} dari 3.
+        {sudahKirim ? (
+          <div className="rounded-xl border border-slate-600 bg-slate-900/60 p-3">
+            <p className="mb-2 text-xs font-semibold text-slate-300">
+              {jurnalSaya!.sifat_dipilih === 'pribadi'
+                ? '👛 Kamu mencatatnya sebagai transaksi pribadi:'
+                : jurnalSaya!.tanpa_jurnal
+                  ? '🛡️ Kamu menyatakan tidak ada jurnal yang perlu dicatat.'
+                  : 'Jurnal yang kamu kirim:'}
             </p>
-            <p className="mt-0.5 leading-relaxed">
-              Coba lagi — kalau benar di percobaan kedua, nilaimu 50.
-            </p>
+            {jurnalSaya!.sifat_dipilih === 'pribadi' ? (
+              <p className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="text-slate-300">Uang keluar dari Dompet Pribadi</span>
+                <span className="tabular-nums font-bold text-slate-200">
+                  {rupiah(jurnalSaya!.nominal)}
+                </span>
+              </p>
+            ) : (
+              !jurnalSaya!.tanpa_jurnal && (
+                <BarisJurnal
+                  debit={jurnalSaya!.akun_debit}
+                  kredit={jurnalSaya!.akun_kredit}
+                  nominal={jurnalSaya!.nominal}
+                />
+              )
+            )}
+            {!reveal && (
+              <p className="mt-2 text-center text-[11px] text-slate-400">
+                ✅ Terkirim dan terkunci. Hasilnya dibuka setelah fasilitator menutup waktu.
+              </p>
+            )}
           </div>
-        )}
-
-        {selesai ? (
-          <RingkasanJawaban
-            hasil={hasil}
-            jurnalSaya={jurnalSaya}
-            nominal={soal.nominal}
-            wajib={wajib}
-          />
-        ) : dipandu ? (
-          <PanduanJawaban
-            hasil={hasil!}
-            nominal={soal.nominal}
-            sibuk={sibuk}
-            onKirim={kirimPanduan}
-          />
         ) : habis ? (
           <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-center text-xs text-red-300">
             ⏱️ Waktu habis.
@@ -1151,6 +1177,47 @@ function FaseMenjurnal({
             </div>
           )}
 
+          {jurnalSaya && (
+            <div className="mt-3">
+              {jurnalSaya.benar ? (
+                <p className="rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300">
+                  ✅ Jawabanmu tepat — nilai 100
+                  {wajib ? ' dan sudah masuk pembukuanmu.' : ' (latihan).'}
+                </p>
+              ) : (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  <p className="font-semibold">❌ Jawabanmu belum tepat — nilai 0.</p>
+                  {jurnalSaya.sifat_dipilih && jurnalSaya.sifat_dipilih !== soalLengkap.sifat && (
+                    <p className="mt-1">
+                      Kamu memilih ranah{' '}
+                      {jurnalSaya.sifat_dipilih === 'pribadi' ? 'pribadi' : 'bisnis'}, padahal ini
+                      urusan {soalLengkap.sifat === 'pribadi' ? 'pribadi pemilik' : 'usaha'}.
+                    </p>
+                  )}
+                  {jurnalSaya.diperbaiki ? (
+                    <p className="mt-2 font-semibold text-green-300">
+                      ✅ Pembukuanmu sudah dibetulkan.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-red-300/80">
+                        Nilaimu sudah terkunci 0, tapi pembukuanmu masih harus dibetulkan — buku
+                        yang salah akan menyeret laporanmu di putaran berikutnya.
+                      </p>
+                      <button
+                        onClick={perbaiki}
+                        disabled={sibuk}
+                        className="mt-2 w-full rounded-lg bg-sky-600 py-2.5 text-sm font-bold text-white transition hover:bg-sky-500 active:scale-[.98] disabled:opacity-40"
+                      >
+                        {sibuk ? 'Membetulkan…' : '🛠️ Betulkan pembukuanku'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {showInsight && soalLengkap.insight && (
             <div className="animasi-muncul mt-3 rounded-xl border border-sky-500/40 bg-sky-500/10 p-3">
               <p className="mb-1 text-xs font-bold text-sky-300">💡 Insight</p>
@@ -1159,135 +1226,6 @@ function FaseMenjurnal({
           )}
         </Kartu>
       )}
-    </div>
-  )
-}
-
-/** Ringkasan setelah jawaban final — benar maupun habis percobaan. */
-function RingkasanJawaban({
-  hasil,
-  jurnalSaya,
-  nominal,
-  wajib,
-}: {
-  hasil: HasilPercobaan | null
-  jurnalSaya: Jurnal | null
-  nominal: number
-  wajib: boolean
-}) {
-  const benar = hasil?.benar ?? jurnalSaya?.benar ?? false
-  const nilai = hasil?.nilai ?? jurnalSaya?.nilai ?? 0
-  const percobaan = hasil?.percobaan ?? jurnalSaya?.percobaan ?? 0
-
-  return (
-    <div
-      className={`rounded-xl border p-3 ${
-        benar
-          ? 'border-green-500/40 bg-green-500/10'
-          : 'border-slate-600 bg-slate-900/60'
-      }`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className={`text-sm font-bold ${benar ? 'text-green-300' : 'text-slate-200'}`}>
-          {benar ? '✅ Jawaban tepat' : '📝 Sudah dibetulkan'}
-        </p>
-        <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wide text-slate-400">Nilai</p>
-          <p
-            className={`tabular-nums text-lg font-bold ${
-              nilai === 100 ? 'text-green-400' : nilai === 50 ? 'text-amber-300' : 'text-slate-400'
-            }`}
-          >
-            {nilai}
-          </p>
-        </div>
-      </div>
-
-      <p className="mt-1 text-[11px] text-slate-400">
-        {percobaan > 0 && `Selesai di percobaan ${percobaan}. `}
-        {wajib
-          ? benar
-            ? 'Sudah masuk pembukuanmu.'
-            : 'Catatanmu sudah dibetulkan mengikuti kunci.'
-          : 'Giliran ini latihan — jawabanmu tetap dinilai, tapi tidak masuk pembukuan.'}
-      </p>
-
-      {hasil?.kunci_sifat === 'bisnis' && hasil.kunci_debit && hasil.kunci_kredit && (
-        <div className="mt-2 border-t border-slate-700 pt-2">
-          <p className="mb-1 text-[11px] font-semibold text-slate-400">Jurnal yang benar:</p>
-          <BarisJurnal debit={hasil.kunci_debit} kredit={hasil.kunci_kredit} nominal={nominal} />
-        </div>
-      )}
-      {hasil?.kunci_sifat === 'pribadi' && (
-        <p className="mt-2 border-t border-slate-700 pt-2 text-[11px] text-slate-400">
-          👛 Urusan pribadi — cukup dicatat di Dompet Pribadi, tanpa jurnal.
-        </p>
-      )}
-
-      {hasil?.insight && (
-        <div className="animasi-muncul mt-2 rounded-lg border border-sky-500/40 bg-sky-500/10 p-2">
-          <p className="mb-0.5 text-[11px] font-bold text-sky-300">💡 Insight</p>
-          <p className="text-[11px] leading-relaxed text-slate-200">{hasil.insight}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * Setelah dua percobaan gagal, kunci ditunjukkan dan peserta tinggal
- * membetulkan catatannya. Nilainya memang sudah 0 — tapi pembukuannya harus
- * tetap berakhir benar, karena buku yang salah akan menyeret seluruh laporan
- * di putaran-putaran berikutnya.
- */
-function PanduanJawaban({
-  hasil,
-  nominal,
-  sibuk,
-  onKirim,
-}: {
-  hasil: HasilPercobaan
-  nominal: number
-  sibuk: boolean
-  onKirim: () => void
-}) {
-  return (
-    <div className="animasi-muncul rounded-xl border border-sky-500/50 bg-sky-500/10 p-3">
-      <p className="text-sm font-bold text-sky-200">Dua percobaan sudah terpakai</p>
-      <p className="mt-0.5 text-[11px] leading-relaxed text-sky-100/80">
-        Ini jawaban yang benar. Nilaimu untuk soal ini 0, tapi catatanmu tetap harus dibetulkan —
-        pembukuan yang salah akan menyeret laporanmu di putaran berikutnya.
-      </p>
-
-      <div className="mt-3 rounded-lg border border-slate-600 bg-slate-900/60 p-3">
-        {hasil.kunci_sifat === 'pribadi' ? (
-          <p className="text-xs leading-relaxed text-slate-200">
-            👛 <b>Transaksi pribadi</b> — uang keluar dari Dompet Pribadi sebesar{' '}
-            {rupiah(nominal)}. Tidak ada jurnal sama sekali.
-          </p>
-        ) : hasil.kunci_debit && hasil.kunci_kredit ? (
-          <>
-            <p className="mb-2 text-xs font-semibold text-slate-300">💼 Transaksi bisnis:</p>
-            <BarisJurnal debit={hasil.kunci_debit} kredit={hasil.kunci_kredit} nominal={nominal} />
-          </>
-        ) : (
-          <p className="text-xs leading-relaxed text-slate-200">
-            🛡️ Tidak ada jurnal — kerugian ini ditanggung polismu.
-          </p>
-        )}
-      </div>
-
-      {hasil.insight && (
-        <p className="mt-2 text-[11px] leading-relaxed text-sky-100/90">💡 {hasil.insight}</p>
-      )}
-
-      <button
-        onClick={onKirim}
-        disabled={sibuk}
-        className="mt-3 w-full rounded-xl bg-sky-600 py-3 font-bold text-white transition hover:bg-sky-500 active:scale-[.98] disabled:opacity-40"
-      >
-        {sibuk ? 'Mencatat…' : 'Catat jawaban yang benar'}
-      </button>
     </div>
   )
 }
