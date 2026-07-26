@@ -389,10 +389,12 @@ function FormDaftar({ onDaftar }: { onDaftar: (p: TipePeserta) => void }) {
           <p className="text-xs font-semibold text-slate-100">
             Modal awalmu {rupiah(MODAL_AWAL)} — bagi ke dua dompet
           </p>
+          {/* Jangan menyinggung kebakaran atau musibah di sini: soal kejadian
+              harus datang sebagai kejutan, bukan sesuatu yang sudah diantisipasi
+              peserta sejak layar pendaftaran. */}
           <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-            Uang di Dompet Bisnis bisa tumbuh dari penjualan, tapi ikut terancam kerugian dan
-            kebakaran. Uang di Dompet Pribadi aman, tapi diam saja. Pemenang dinilai dari{' '}
-            <b>jumlah keduanya</b>.
+            Uang di Dompet Bisnis ikut bergerak mengikuti jalannya usaha. Uang di Dompet Pribadi
+            diam saja. Pemenang dinilai dari <b>jumlah keduanya</b>.
           </p>
 
           <p className="mt-3 text-[10px] uppercase tracking-wide text-amber-300/80">

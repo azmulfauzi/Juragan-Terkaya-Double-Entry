@@ -27,12 +27,19 @@ function potonganPie(cx: number, cy: number, r: number, mulaiDeg: number, akhirD
 export default function SpinWheel({ hasil, pemicu, ukuran = 280, onSelesai }: Props) {
   const [rotasi, setRotasi] = useState(0)
   const [berputar, setBerputar] = useState(false)
-  const pemicuSebelumnya = useRef(pemicu)
+  // Dibandingkan sebagai gabungan putaran + warna, dan dimulai dari null.
+  //
+  // Sebelumnya penanda ini diisi nilai `pemicu` saat pertama dirender, sehingga
+  // roda yang baru muncul bersamaan dengan hasilnya dianggap "tidak berubah"
+  // dan tidak pernah berputar sama sekali. Persis itu yang terjadi di layar
+  // fasilitator: komponennya baru dipasang saat fase menjurnal dimulai.
+  const putaranTerakhir = useRef<string | null>(null)
 
   useEffect(() => {
-    if (pemicu === pemicuSebelumnya.current) return
-    pemicuSebelumnya.current = pemicu
     if (!hasil) return
+    const kunci = `${pemicu}-${hasil}`
+    if (kunci === putaranTerakhir.current) return
+    putaranTerakhir.current = kunci
 
     const indeks = DAFTAR_WARNA.indexOf(hasil)
     const sudutSegmen = 360 / DAFTAR_WARNA.length

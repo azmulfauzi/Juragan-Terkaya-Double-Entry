@@ -69,6 +69,7 @@ function Dashboard() {
   const [galat, setGalat] = useState<string | null>(null)
   const [sibuk, setSibuk] = useState(false)
   const [pesertaDipilih, setPesertaDipilih] = useState<string | null>(null)
+  const [kendaliKhusus, setKendaliKhusus] = useState(false)
 
   const muat = useCallback(async () => {
     try {
@@ -391,65 +392,107 @@ function Dashboard() {
               <Tombol onClick={reset} sibuk={sibuk} bahaya>
                 ♻️ Reset
               </Tombol>
+              <button
+                onClick={() => setKendaliKhusus((v) => !v)}
+                title="Kendali khusus"
+                className="rounded-xl border border-slate-700 px-3 py-2.5 text-sm text-slate-500 transition hover:bg-slate-700 hover:text-slate-200"
+              >
+                ⚙️
+              </button>
             </div>
           </Kartu>
 
-          {/* Tawaran asuransi — hanya dari fase menunggu, karena ia menggantikan
-              satu putaran penuh (tanpa pilih warna dan tanpa roda). */}
-          {(state.fase === 'menunggu' || state.fase === 'selesai') &&
-            soalKeputusan.length > 0 && (
-              <Kartu>
-                <p className="text-sm font-semibold text-slate-100">🛡️ Tawarkan asuransi</p>
-                <p className="mb-2 mt-0.5 text-[11px] leading-relaxed text-slate-400">
-                  Seluruh peserta memutuskan sendiri, tanpa roda. Tidak dihitung dalam akurasi.
-                  Tawarkan ini lebih dulu, baru munculkan musibahnya beberapa putaran kemudian.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {soalKeputusan.map((s) => (
-                    <Tombol key={s.id} onClick={() => tawarkanAsuransi(s)} sibuk={sibuk}>
-                      {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)}
-                      {pemegangPolis.has(s.polis ?? '') && ' · sudah pernah ditawarkan'}
-                    </Tombol>
-                  ))}
-                </div>
-              </Kartu>
-            )}
-
-          {/* Musibah — dimunculkan saat peserta sudah memilih warna, supaya roda
-              tetap yang menentukan siapa yang tertimpa. */}
-          {state.fase === 'pilih_warna' && soalKejadian.length > 0 && (
+          {/* KENDALI KHUSUS — sengaja tertutup rapat.
+              Layar fasilitator di-share ke peserta. Begitu mereka melihat ada
+              tombol musibah, kejutannya hilang: peserta jadi tahu kebakaran itu
+              ada dan menunggu-nunggu kapan datangnya. Buka sebentar, klik, lalu
+              panel ini menutup sendiri. */}
+          {kendaliKhusus && (
             <Kartu>
-              <p className="text-sm font-semibold text-slate-100">💥 Atau munculkan musibah</p>
-              <p className="mb-2 mt-0.5 text-[11px] leading-relaxed text-slate-400">
-                Menggantikan undian acak untuk putaran ini. Roda tetap berputar menentukan
-                korbannya. Pemegang polis yang cocok tidak perlu menjurnal apa pun.
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-100">⚙️ Kendali khusus</p>
+                <button
+                  onClick={() => setKendaliKhusus(false)}
+                  className="text-[11px] text-slate-400 underline"
+                >
+                  tutup
+                </button>
+              </div>
+              <p className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
+                Tutup lagi begitu selesai — isi panel ini tidak boleh terbaca peserta.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {soalKejadian.map((s) => (
-                  <Tombol key={s.id} onClick={() => munculkanKejadian(s)} sibuk={sibuk}>
-                    {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)} ·{' '}
-                    {(pemegangPolis.get(s.polis ?? '') ?? []).length} terlindungi
-                  </Tombol>
-                ))}
-              </div>
-            </Kartu>
-          )}
 
-          {pemegangPolis.size > 0 && (
-            <Kartu>
-              <p className="mb-2 text-sm font-semibold text-slate-100">🛡️ Pemegang polis aktif</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {[...pemegangPolis.entries()].map(([polis, nama]) => (
-                  <div key={polis} className="rounded-lg border border-slate-700 p-2">
-                    <p className="text-xs font-semibold text-slate-300">
-                      {polis === 'kendaraan' ? '🚗 Kendaraan' : '🔥 Kebakaran'} · {nama.length} orang
-                    </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-                      {nama.join(', ')}
-                    </p>
+              {(state.fase === 'menunggu' || state.fase === 'selesai') &&
+                soalKeputusan.length > 0 && (
+                  <div className="mb-3">
+                    <p className="mb-1.5 text-xs font-semibold text-slate-300">🛡️ Tawaran polis</p>
+                    <div className="flex flex-wrap gap-2">
+                      {soalKeputusan.map((s) => (
+                        <Tombol
+                          key={s.id}
+                          onClick={() => {
+                            setKendaliKhusus(false)
+                            void tawarkanAsuransi(s)
+                          }}
+                          sibuk={sibuk}
+                        >
+                          {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)}
+                          {pemegangPolis.has(s.polis ?? '') && ' · sudah ditawarkan'}
+                        </Tombol>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
+                )}
+
+              {state.fase === 'pilih_warna' && soalKejadian.length > 0 && (
+                <div className="mb-3">
+                  <p className="mb-1.5 text-xs font-semibold text-slate-300">
+                    💥 Kejadian (menggantikan undian acak putaran ini)
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {soalKejadian.map((s) => (
+                      <Tombol
+                        key={s.id}
+                        onClick={() => {
+                          setKendaliKhusus(false)
+                          void munculkanKejadian(s)
+                        }}
+                        sibuk={sibuk}
+                      >
+                        {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)} ·{' '}
+                        {(pemegangPolis.get(s.polis ?? '') ?? []).length} terlindungi
+                      </Tombol>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {state.fase !== 'menunggu' &&
+                state.fase !== 'selesai' &&
+                state.fase !== 'pilih_warna' && (
+                  <p className="text-[11px] text-slate-500">
+                    Tawaran polis dibuka dari fase menunggu, kejadian dari fase pilih warna.
+                  </p>
+                )}
+
+              {pemegangPolis.size > 0 && (
+                <div className="border-t border-slate-700 pt-2">
+                  <p className="mb-1.5 text-xs font-semibold text-slate-300">Pemegang polis aktif</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {[...pemegangPolis.entries()].map(([polis, nama]) => (
+                      <div key={polis} className="rounded-lg border border-slate-700 p-2">
+                        <p className="text-xs font-semibold text-slate-300">
+                          {polis === 'kendaraan' ? '🚗 Kendaraan' : '🔥 Kebakaran'} · {nama.length}{' '}
+                          orang
+                        </p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                          {nama.join(', ')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Kartu>
           )}
 
