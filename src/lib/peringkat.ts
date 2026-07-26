@@ -19,7 +19,20 @@ export interface StatPeserta {
   saldoKas: number
   /** Uang di luar pembukuan. Aman dari kerugian usaha, tapi juga tidak tumbuh. */
   dompetPribadi: number
-  /** Saldo Kas bisnis + Dompet Pribadi — inilah pemeringkat sesungguhnya. */
+  /** Total Aset − Kewajiban. Sama dengan Total Modal di Neraca. */
+  ekuitasBisnis: number
+  /**
+   * Ekuitas usaha + Dompet Pribadi — pemeringkat sesungguhnya.
+   *
+   * Dulu memakai Saldo Kas, dan itu keliru: kebakaran memusnahkan Persediaan,
+   * bukan Kas, sehingga peserta yang menolak asuransi tidak merasakan apa pun
+   * sementara yang membeli kasnya berkurang. Ukurannya justru menghukum yang
+   * berhati-hati.
+   *
+   * Secara aljabar ini setara dengan `modal awal + laba bersih − belanja
+   * pribadi`: memindahkan uang antar dompet saling menghapus, karena memang
+   * tidak menciptakan kekayaan apa pun.
+   */
   totalKekayaan: number
   totalAset: number
   labaBersih: number
@@ -126,7 +139,8 @@ export function hitungPeringkat(
       pembukuan,
       saldoKas: pembukuan.saldoKas,
       dompetPribadi,
-      totalKekayaan: pembukuan.saldoKas + dompetPribadi,
+      ekuitasBisnis: pembukuan.neraca.totalModal,
+      totalKekayaan: pembukuan.neraca.totalModal + dompetPribadi,
       totalAset: pembukuan.totalAset,
       labaBersih: pembukuan.labaBersih,
       jumlahWajib,

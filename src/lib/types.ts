@@ -167,6 +167,8 @@ export interface Soal {
   sifat: Sifat
   /** Hanya untuk soal pribadi: uang keluar dari atau masuk ke dompet pribadi. */
   arah_kas: 'keluar' | 'masuk' | null
+  /** Hanya soal aktif yang ikut diundi dan muncul di tombol fasilitator. */
+  aktif: boolean
   teks: string
   nominal: number
   opsi_debit: string[]
@@ -198,9 +200,10 @@ export interface HasilPerbaikan {
  * `jenis` dan `polis` boleh dihilangkan; keduanya diisi 'biasa'/null saat benih
  * dimasukkan, supaya 44 soal lama tidak perlu ditulisi satu per satu.
  */
-export type SoalBenih = Omit<Soal, 'jenis' | 'polis' | 'sifat' | 'arah_kas'> & {
+export type SoalBenih = Omit<Soal, 'jenis' | 'polis' | 'sifat' | 'arah_kas' | 'aktif'> & {
   jenis?: JenisSoal
   polis?: Polis | null
   sifat?: Sifat
   arah_kas?: 'keluar' | 'masuk' | null
+  aktif?: boolean
 }

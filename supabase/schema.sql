@@ -124,6 +124,12 @@ create table if not exists soal (
   jenis        text   not null default 'biasa',
   -- kebakaran | kendaraan — penghubung soal keputusan dengan soal kejadian
   polis        text,
+  -- bisnis = dijurnal. pribadi = cukup mutasi Dompet Pribadi dengan keterangan.
+  sifat        text   not null default 'bisnis',
+  -- Hanya untuk soal pribadi: keluar dari atau masuk ke dompet pribadi.
+  arah_kas     text,
+  -- Hanya soal aktif yang ikut diundi dan muncul di tombol fasilitator.
+  aktif        boolean not null default true,
   teks         text   not null,
   nominal      bigint not null default 0,
   opsi_debit   jsonb  not null,              -- array 4 kode akun

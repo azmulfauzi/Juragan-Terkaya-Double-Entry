@@ -366,6 +366,7 @@ export async function seedSoalJikaKosong(): Promise<Soal[]> {
       polis: null,
       sifat: 'bisnis',
       arah_kas: null,
+      aktif: true,
       ...s,
     }))
     const { error: errInsert } = await supabase.from('soal').insert(benih)

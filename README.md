@@ -24,8 +24,9 @@ dengan database yang terpisah.
    > menjalankan migrasinya berurutan:
    > [`migrasi-01-asuransi.sql`](supabase/migrasi-01-asuransi.sql),
    > [`migrasi-02-dua-dompet.sql`](supabase/migrasi-02-dua-dompet.sql),
-   > [`migrasi-03-percobaan-dan-ranah.sql`](supabase/migrasi-03-percobaan-dan-ranah.sql), lalu
-   > [`migrasi-04-satu-kesempatan.sql`](supabase/migrasi-04-satu-kesempatan.sql).
+   > [`migrasi-03-percobaan-dan-ranah.sql`](supabase/migrasi-03-percobaan-dan-ranah.sql),
+   > [`migrasi-04-satu-kesempatan.sql`](supabase/migrasi-04-satu-kesempatan.sql), lalu
+   > [`migrasi-05-soal-aktif-dan-premi.sql`](supabase/migrasi-05-soal-aktif-dan-premi.sql).
 3. Buka **Project Settings → Data API**, salin **Project URL** dan **anon key**.
 4. Salin `.env.example` menjadi `.env`, isi kedua nilai tersebut dan tentukan
    `VITE_FASILITATOR_PIN`.
@@ -41,6 +42,16 @@ npm run dev
 
 Bank soal (44 kasus) terisi otomatis dari `src/data/soal.ts` saat halaman fasilitator dibuka
 pertama kali. Setelah itu bank soal hidup di database dan diedit lewat UI.
+
+## Memilih soal yang dipakai
+
+Di tab **✏️ Editor Soal** setiap soal punya kotak centang. **Hanya soal yang dicentang yang ikut
+diundi**, dan hanya penawaran/special event yang dicentang yang muncul di tombol fasilitator.
+Tersedia juga tombol *Centang yang tampil* dan *Lepas yang tampil* yang bekerja pada hasil
+pencarian dan filter kategori — praktis untuk menyiapkan sesi 30 menit maupun 2 jam dari bank soal
+yang sama, tanpa menghapus apa pun.
+
+Jumlah soal aktif selalu terlihat di header halaman fasilitator.
 
 ## Perintah
 
@@ -150,12 +161,24 @@ dikirim ke perangkat peserta selama putaran berjalan.
 
 ## Penentuan pemenang
 
-**Nilai → Total Kekayaan → Kecepatan.**
+**Nilai → Kekayaan Bersih → Kecepatan.**
 
-Nilai didahulukan karena ia satu-satunya ukuran yang bersih dari keberuntungan. Total Kekayaan
-(Saldo Kas bisnis + Dompet Pribadi) menyusul sebagai pembeda kedua — di situlah undian warna,
-pilihan dompet, dan keputusan asuransi bekerja. Keberuntungan tetap punya tempat, hanya saja
-tidak bisa mengalahkan ketelitian.
+**Kekayaan Bersih = Ekuitas Usaha (Total Aset − Kewajiban) + Dompet Pribadi.**
+
+Sengaja bukan saldo kas. Kebakaran memusnahkan Persediaan tanpa menyentuh Kas sama sekali, jadi
+ukuran berbasis kas justru membuat peserta yang menolak asuransi tampak lebih unggul daripada
+yang membayar premi — kebalikan dari pelajarannya. Secara aljabar ukuran ini setara dengan
+`modal awal + laba bersih − belanja pribadi`: memindahkan uang antar dompet saling menghapus,
+karena memang tidak menciptakan kekayaan apa pun.
+
+Premi asuransi karena itu dicatat langsung sebagai **Beban Asuransi**, bukan aset dibayar dimuka.
+Selama ia dicatat sebagai aset, premi tidak pernah mengurangi kekayaan siapa pun dan membeli
+polis terasa gratis. Sekarang taruhannya jelas: bayar Rp1.200.000 sekarang, atau tanggung
+Rp3.500.000 kalau terbakar.
+
+Nilai didahulukan karena ia satu-satunya ukuran yang bersih dari keberuntungan. Kekayaan Bersih
+menyusul sebagai pembeda kedua — di situlah undian warna dan keputusan asuransi bekerja.
+Keberuntungan tetap punya tempat, hanya saja tidak bisa mengalahkan ketelitian.
 
 Tab **📚 Pemahaman** memisahkan sisi ini sepenuhnya: peserta diurutkan dari jumlah jawaban yang
 tepat sejak percobaan pertama, tanpa menyinggung kekayaan sama sekali. Itu bahan evaluasi materi
@@ -201,6 +224,7 @@ supabase/
   migrasi-02-dua-dompet.sql Tambahan dua dompet untuk database lama
   migrasi-03-percobaan-dan-ranah.sql  Ranah bisnis/pribadi dan nilai
   migrasi-04-satu-kesempatan.sql      Satu kesempatan, hasil dibuka saat reveal
+  migrasi-05-soal-aktif-dan-premi.sql Soal aktif/nonaktif, premi jadi beban
 uji/              Uji tanpa kerangka tambahan (npm run uji)
 ```
 

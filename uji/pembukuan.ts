@@ -158,6 +158,48 @@ const pembukaan = (p: string, nilai = 10_000_000) =>
   )
 }
 
+// 9b. Kekayaan Bersih menangkap kebakaran; saldo kas tidak.
+//
+//     Inilah alasan pemeringkatnya dipindah dari kas ke ekuitas. Kebakaran
+//     memusnahkan Persediaan tanpa menyentuh Kas sama sekali, sehingga dengan
+//     ukuran berbasis kas peserta yang menolak asuransi justru terlihat lebih
+//     unggul daripada yang membayar premi — kebalikan dari pelajarannya.
+{
+  const orang = (id: string, nama: string): Peserta => ({
+    id,
+    nama,
+    alokasi_bisnis: 10_000_000,
+    created_at: '',
+  })
+  const daftar = [orang('h', 'Hana'), orang('i', 'Iwan')]
+  const jurnal: Jurnal[] = [
+    pembukaan('h'),
+    pembukaan('i'),
+    // Keduanya belanja persediaan Rp4.000.000.
+    j('h', 1, '1-300', '1-100', 4_000_000, { benar: true }),
+    j('i', 1, '1-300', '1-100', 4_000_000, { benar: true }),
+    // Hana membeli polis kebakaran Rp1.200.000 — kini dicatat sebagai BEBAN.
+    j('h', 2, '5-700', '1-100', 1_200_000, { benar: true, wajib: false }),
+    // Kebakaran melahap persediaan Rp3.500.000. Hana terlindungi, jadi tidak
+    // ada jurnal sama sekali. Iwan menanggung sendiri.
+    j('i', 3, '5-600', '1-300', 3_500_000, { benar: true }),
+  ]
+
+  const hasil = hitungPeringkat(daftar, jurnal, [])
+  const hana = hasil.baris.find((b) => b.peserta.nama === 'Hana')!
+  const iwan = hasil.baris.find((b) => b.peserta.nama === 'Iwan')!
+
+  cek('asuransi: kas Hana justru lebih kecil', hana.saldoKas, 4_800_000)
+  cek('asuransi: kas Iwan utuh walau terbakar', iwan.saldoKas, 6_000_000)
+  cek('asuransi: ukuran lama (kas) memenangkan Iwan', iwan.saldoKas > hana.saldoKas, true)
+
+  cek('asuransi: kekayaan bersih Hana', hana.totalKekayaan, 8_800_000)
+  cek('asuransi: kekayaan bersih Iwan', iwan.totalKekayaan, 6_500_000)
+  cek('asuransi: ukuran baru memenangkan yang berasuransi', hasil.baris[0].peserta.nama, 'Hana')
+  cek('asuransi: premi benar-benar jadi beban', hana.labaBersih, -1_200_000)
+  cek('asuransi: kerugian kebakaran masuk laba Iwan', iwan.labaBersih, -3_500_000)
+}
+
 // 10. Nilai 100 / 0 — satu kesempatan menjawab
 {
   const orang = (id: string, nama: string): Peserta => ({

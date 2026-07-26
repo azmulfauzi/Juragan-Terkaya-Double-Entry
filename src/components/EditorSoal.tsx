@@ -42,6 +42,7 @@ function soalKosong(id: number): Soal {
     polis: null,
     sifat: 'bisnis',
     arah_kas: null,
+    aktif: true,
     teks: '',
     nominal: 1_000_000,
     opsi_debit: ['1-100', '1-200', '1-300', '5-600'],
@@ -99,6 +100,38 @@ export default function EditorSoal({ onTutup }: Props) {
       await muat()
       setEdit(null)
       setPesan(null)
+    } catch (e) {
+      setPesan(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSibuk(false)
+    }
+  }
+
+  /**
+   * Mencentang atau melepas satu soal.
+   *
+   * Hanya soal aktif yang ikut diundi dan muncul di tombol penawaran/special
+   * event. Ini cara memakai satu bank soal untuk sesi 30 menit maupun 2 jam
+   * tanpa perlu menghapus apa pun.
+   */
+  async function ubahAktif(soal: Soal, aktif: boolean) {
+    setDaftar((lama) => lama.map((s) => (s.id === soal.id ? { ...s, aktif } : s)))
+    try {
+      await simpanSoal({ ...soal, aktif })
+    } catch (e) {
+      setPesan(e instanceof Error ? e.message : String(e))
+      await muat() // kembalikan ke keadaan sebenarnya kalau gagal
+    }
+  }
+
+  /** Mencentang atau melepas seluruh soal yang sedang tampil di daftar. */
+  async function ubahAktifSemua(aktif: boolean) {
+    setSibuk(true)
+    try {
+      for (const s of tersaring) {
+        if (s.aktif !== aktif) await simpanSoal({ ...s, aktif })
+      }
+      await muat()
     } catch (e) {
       setPesan(e instanceof Error ? e.message : String(e))
     } finally {
@@ -184,14 +217,54 @@ export default function EditorSoal({ onTutup }: Props) {
             </select>
           </div>
 
-          <p className="text-xs text-slate-400">
-            {tersaring.length} dari {daftar.length} soal
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-400">
+              Menampilkan {tersaring.length} dari {daftar.length} soal ·{' '}
+              <span className="font-semibold text-green-400">
+                {daftar.filter((s) => s.aktif).length} aktif
+              </span>{' '}
+              ikut diundi
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => ubahAktifSemua(true)}
+                disabled={sibuk}
+                className="rounded-md bg-slate-700 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-600 disabled:opacity-40"
+              >
+                Centang yang tampil
+              </button>
+              <button
+                onClick={() => ubahAktifSemua(false)}
+                disabled={sibuk}
+                className="rounded-md bg-slate-700 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:bg-slate-600 disabled:opacity-40"
+              >
+                Lepas yang tampil
+              </button>
+            </div>
+          </div>
 
           <div className="space-y-2">
             {tersaring.map((s) => (
-              <div key={s.id} className="rounded-xl border border-slate-700 bg-slate-800/50 p-3">
+              <div
+                key={s.id}
+                className={`rounded-xl border p-3 transition ${
+                  s.aktif
+                    ? 'border-slate-700 bg-slate-800/50'
+                    : 'border-slate-800 bg-slate-900/40 opacity-50'
+                }`}
+              >
                 <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <label className="flex cursor-pointer items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={s.aktif}
+                      onChange={(e) => ubahAktif(s, e.target.checked)}
+                      className="h-4 w-4 accent-green-500"
+                    />
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      {s.aktif ? 'dipakai' : 'nonaktif'}
+                    </span>
+                  </label>
                   <span className="rounded-md bg-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-300">
                     #{s.id}
                   </span>

@@ -22,7 +22,7 @@ export function pilihSoalAcak(semuaSoal: Soal[], riwayat: number[]): Soal | null
   // ikut diundi — keduanya dimunculkan fasilitator pada momen yang tepat.
   // Kebakaran yang keluar di putaran kedua, saat belum ada yang sempat membeli
   // polis, hanya jadi kerugian biasa tanpa pelajaran apa pun.
-  const biasa = semuaSoal.filter((s) => s.jenis === 'biasa')
+  const biasa = semuaSoal.filter((s) => s.jenis === 'biasa' && s.aktif !== false)
   if (biasa.length === 0) return null
 
   const belumDipakai = biasa.filter((s) => !riwayat.includes(s.id))

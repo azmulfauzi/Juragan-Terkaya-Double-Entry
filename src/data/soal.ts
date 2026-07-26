@@ -586,10 +586,10 @@ export const SOAL_DEFAULT: SoalBenih[] = [
     nominal: 1_200_000,
     opsi_debit: ['1-600', '5-700', '5-600', '1-400'],
     opsi_kredit: ['1-100', '1-600', '2-100', '5-700'],
-    debit_benar: '1-600',
+    debit_benar: '5-700',
     kredit_benar: '1-100',
     insight:
-      'Premi 1 tahun yang dibayar di muka BELUM menjadi beban — manfaatnya baru akan dinikmati sepanjang tahun ke depan, jadi ia masih aset: Asuransi Dibayar Dimuka. Perhatikan bahwa membeli polis membuat kas berkurang Rp1.200.000 hari ini, sementara yang menolak kasnya utuh. Sampai di sini, yang menolak terlihat lebih pintar.',
+      'Premi asuransi adalah biaya perlindungan untuk periode berjalan, jadi dicatat sebagai Beban Asuransi. Perhatikan taruhannya: yang membeli kehilangan preminya hari ini dengan pasti, yang menolak menyimpan uangnya tapi menanggung sendiri kalau musibah datang. Premi selalu terasa mahal — sampai kebakaran benar-benar terjadi.',
   },
   {
     id: 46,
@@ -600,10 +600,10 @@ export const SOAL_DEFAULT: SoalBenih[] = [
     nominal: 900_000,
     opsi_debit: ['1-600', '5-700', '5-500', '1-500'],
     opsi_kredit: ['1-100', '1-600', '2-200', '5-500'],
-    debit_benar: '1-600',
+    debit_benar: '5-700',
     kredit_benar: '1-100',
     insight:
-      'Sama seperti asuransi kebakaran: dibayar di muka untuk 1 tahun, jadi dicatat sebagai aset, bukan Beban Transportasi. Kendaraan operasional dipakai tiap hari di jalan — pertanyaannya bukan apakah risikonya ada, tapi apakah usahamu sanggup menanggungnya sendiri kalau terjadi.',
+      'Sama seperti asuransi kebakaran: preminya beban periode ini, bukan aset dan bukan Beban Transportasi. Kendaraan operasional dipakai tiap hari di jalan — pertanyaannya bukan apakah risikonya ada, tapi apakah usahamu sanggup menanggung sendiri kalau terjadi.',
   },
 
   // ══════════════════════ MUSIBAH (jenis: kejadian) ══════════════════════
@@ -668,6 +668,21 @@ export const SOAL_DEFAULT: SoalBenih[] = [
     kredit_benar: '1-300',
     insight:
       'Perhatikan baik-baik apa yang hilang: yang dinilai di sini adalah muatannya, yaitu Persediaan. Peserta yang otomatis memilih Peralatan karena membaca kata "mobil" akan salah. Selalu tanya dulu: aset mana yang benar-benar berkurang?',
+  },
+
+  {
+    id: 61,
+    kategori: 'non_kas',
+    jenis: 'kejadian',
+    polis: 'kendaraan',
+    teks: 'Motor operasional hilang dicuri saat diparkir di depan kios. Nilai tercatatnya Rp6.000.000.',
+    nominal: 6_000_000,
+    opsi_debit: ['5-600', '1-500', '5-500', '3-200'],
+    opsi_kredit: ['1-500', '1-100', '5-600', '2-100'],
+    debit_benar: '5-600',
+    kredit_benar: '1-500',
+    insight:
+      'Kehilangan karena pencurian diperlakukan sama seperti kerusakan total: asetnya lenyap, jadi Peralatan dikredit dan nilainya diakui sebagai kerugian. Yang berasuransi kendaraan tidak mencatat apa pun — itulah gunanya premi yang dibayar di awal.',
   },
 
   // ══════════════════ TRANSAKSI PRIBADI (sifat: pribadi) ══════════════════

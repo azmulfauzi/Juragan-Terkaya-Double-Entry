@@ -168,7 +168,10 @@ export default function Peserta() {
   const polisSaya = useMemo(() => polisAktif(keputusanSaya), [keputusanSaya])
 
   const dompetPribadi = peserta ? saldoPribadi(peserta.alokasi_bisnis, mutasiSaya) : 0
-  const totalKekayaan = buku.saldoKas + dompetPribadi
+  // Ekuitas usaha, bukan saldo kas: kebakaran memusnahkan persediaan tanpa
+  // menyentuh kas sama sekali, jadi ukuran berbasis kas akan membuat peserta
+  // yang menolak asuransi tampak tidak dirugikan apa pun.
+  const totalKekayaan = buku.neraca.totalModal + dompetPribadi
 
   const keputusanPutaranIni = useMemo(
     () => keputusanSaya.find((k) => k.putaran === putaran) ?? null,
@@ -200,11 +203,15 @@ export default function Peserta() {
   const wajib = Boolean(state?.warna_spin && warnaSaya && state.warna_spin === warnaSaya)
 
   return (
-    <div className="mx-auto max-w-2xl p-3 pb-16">
+    /* Dua kolom di layar lebar: permainan di kiri, pembukuan di kanan yang
+       menempel saat digulir. Di HP tetap menumpuk ke bawah seperti biasa. */
+    <div className="mx-auto max-w-6xl p-3 pb-16">
       {kedaluwarsa && <BannerVersi />}
 
+      <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+        <div className="min-w-0 space-y-3">
       {/* Badge status — selalu terlihat */}
-      <div className="mb-3 rounded-2xl border border-slate-700 bg-slate-800/60 p-3">
+      <div className="rounded-2xl border border-slate-700 bg-slate-800/60 p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-slate-100">{peserta.nama}</p>
@@ -215,7 +222,7 @@ export default function Peserta() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">Total Kekayaan</p>
+            <p className="text-[10px] uppercase tracking-wide text-slate-400">Kekayaan Bersih</p>
             <p
               className={`tabular-nums text-lg font-bold ${
                 totalKekayaan < 0 ? 'text-red-400' : 'text-amber-300'
@@ -241,7 +248,7 @@ export default function Peserta() {
         </div>
       </div>
 
-      <div className="mb-3">
+      <div>
         <Dompet
           pesertaId={peserta.id}
           alokasiBisnis={peserta.alokasi_bisnis}
@@ -260,13 +267,13 @@ export default function Peserta() {
       </div>
 
       {galat && (
-        <p className="mb-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
           {galat}
         </p>
       )}
 
       {/* Panggung utama */}
-      <div className="mb-4">
+      <div>
         {!state || (state.fase === 'menunggu' && !state.berjalan) ? (
           <Kartu>
             <p className="text-center text-sm text-slate-300">
@@ -330,7 +337,12 @@ export default function Peserta() {
         )}
       </div>
 
-      <Pembukuan jurnal={jurnalSaya} petaSoal={petaSoal} judul="📊 Pembukuanku" />
+        </div>
+
+        <div className="min-w-0 lg:sticky lg:top-3">
+          <Pembukuan jurnal={jurnalSaya} petaSoal={petaSoal} judul="📊 Pembukuanku" />
+        </div>
+      </div>
 
       <p className="mt-4 text-center text-[11px] text-slate-500">
         <Link to="/" className="underline">

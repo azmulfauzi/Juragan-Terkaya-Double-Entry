@@ -18,6 +18,7 @@ const SOAL: Soal[] = SOAL_DEFAULT.map((s) => ({
   polis: null,
   sifat: 'bisnis',
   arah_kas: null,
+  aktif: true,
   ...s,
 }))
 
@@ -128,6 +129,26 @@ for (let i = 0; i < 500; i++) {
     gagal++
     console.log(`GAGAL: soal #${terpilih.id} (${terpilih.jenis}) ikut terundi acak`)
     break
+  }
+}
+
+// 5d. Soal yang tidak dicentang fasilitator tidak boleh ikut diundi.
+{
+  const dimatikan = SOAL.map((s) => (s.jenis === 'biasa' ? { ...s, aktif: false } : s))
+  if (pilihSoalAcak(dimatikan, []) !== null) {
+    gagal++
+    console.log('GAGAL: soal nonaktif masih ikut diundi')
+  }
+
+  // Hanya satu soal yang dicentang → undian harus selalu jatuh ke soal itu.
+  const satu = SOAL.map((s) => ({ ...s, aktif: s.id === 1 }))
+  for (let i = 0; i < 50; i++) {
+    const t = pilihSoalAcak(satu, [])
+    if (t?.id !== 1) {
+      gagal++
+      console.log(`GAGAL: undian keluar soal #${t?.id}, padahal hanya #1 yang aktif`)
+      break
+    }
   }
 }
 

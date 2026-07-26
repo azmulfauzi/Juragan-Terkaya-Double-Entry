@@ -70,7 +70,8 @@ function Dashboard() {
   const [galat, setGalat] = useState<string | null>(null)
   const [sibuk, setSibuk] = useState(false)
   const [pesertaDipilih, setPesertaDipilih] = useState<string | null>(null)
-  const [kendaliKhusus, setKendaliKhusus] = useState(false)
+  const [panelPenawaran, setPanelPenawaran] = useState(false)
+  const [panelEvent, setPanelEvent] = useState(false)
 
   const muat = useCallback(async () => {
     try {
@@ -120,12 +121,18 @@ function Dashboard() {
     [peserta],
   )
 
+  // Soal yang tidak dicentang fasilitator tidak ikut ke mana-mana, termasuk
+  // tombol penawaran dan special event.
   const soalKeputusan = useMemo(
-    () => daftarSoal.filter((s) => s.jenis === 'keputusan'),
+    () => daftarSoal.filter((s) => s.jenis === 'keputusan' && s.aktif),
     [daftarSoal],
   )
   const soalKejadian = useMemo(
-    () => daftarSoal.filter((s) => s.jenis === 'kejadian'),
+    () => daftarSoal.filter((s) => s.jenis === 'kejadian' && s.aktif),
+    [daftarSoal],
+  )
+  const jumlahSoalAktif = useMemo(
+    () => daftarSoal.filter((s) => s.jenis === 'biasa' && s.aktif).length,
     [daftarSoal],
   )
 
@@ -272,7 +279,7 @@ function Dashboard() {
         <div>
           <h1 className="text-lg font-bold text-slate-100">🎛️ Fasilitator</h1>
           <p className="text-xs text-slate-400">
-            Putaran {state.putaran} · {peserta.length} peserta ·{' '}
+            Putaran {state.putaran} · {peserta.length} peserta · {jumlahSoalAktif} soal aktif ·{' '}
             <span
               className={
                 koneksi === 'terhubung'
@@ -394,11 +401,22 @@ function Dashboard() {
                 ♻️ Reset
               </Tombol>
               <button
-                onClick={() => setKendaliKhusus((v) => !v)}
-                title="Kendali khusus"
-                className="rounded-xl border border-slate-700 px-3 py-2.5 text-sm text-slate-500 transition hover:bg-slate-700 hover:text-slate-200"
+                onClick={() => {
+                  setPanelPenawaran((v) => !v)
+                  setPanelEvent(false)
+                }}
+                className="rounded-xl border border-slate-700 px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-slate-100"
               >
-                ⚙️
+                🛡️ Penawaran Khusus
+              </button>
+              <button
+                onClick={() => {
+                  setPanelEvent((v) => !v)
+                  setPanelPenawaran(false)
+                }}
+                className="rounded-xl border border-slate-700 px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-slate-100"
+              >
+                💥 Special Event
               </button>
             </div>
           </Kartu>
@@ -408,76 +426,53 @@ function Dashboard() {
               tombol musibah, kejutannya hilang: peserta jadi tahu kebakaran itu
               ada dan menunggu-nunggu kapan datangnya. Buka sebentar, klik, lalu
               panel ini menutup sendiri. */}
-          {kendaliKhusus && (
+          {/* Penawaran polis — menggantikan satu putaran penuh, jadi hanya bisa
+              dibuka dari fase menunggu. */}
+          {panelPenawaran && (
             <Kartu>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-100">⚙️ Kendali khusus</p>
+                <p className="text-sm font-semibold text-slate-100">🛡️ Penawaran Khusus</p>
                 <button
-                  onClick={() => setKendaliKhusus(false)}
+                  onClick={() => setPanelPenawaran(false)}
                   className="text-[11px] text-slate-400 underline"
                 >
                   tutup
                 </button>
               </div>
-              <p className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber-200">
-                Tutup lagi begitu selesai — isi panel ini tidak boleh terbaca peserta.
-              </p>
 
               {(state.fase === 'menunggu' || state.fase === 'selesai') &&
-                soalKeputusan.length > 0 && (
-                  <div className="mb-3">
-                    <p className="mb-1.5 text-xs font-semibold text-slate-300">🛡️ Tawaran polis</p>
-                    <div className="flex flex-wrap gap-2">
-                      {soalKeputusan.map((s) => (
-                        <Tombol
-                          key={s.id}
-                          onClick={() => {
-                            setKendaliKhusus(false)
-                            void tawarkanAsuransi(s)
-                          }}
-                          sibuk={sibuk}
-                        >
-                          {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)}
-                          {pemegangPolis.has(s.polis ?? '') && ' · sudah ditawarkan'}
-                        </Tombol>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {state.fase === 'pilih_warna' && soalKejadian.length > 0 && (
-                <div className="mb-3">
-                  <p className="mb-1.5 text-xs font-semibold text-slate-300">
-                    💥 Kejadian (menggantikan undian acak putaran ini)
+              soalKeputusan.length > 0 ? (
+                <>
+                  <p className="mb-2 text-[11px] leading-relaxed text-slate-400">
+                    Seluruh peserta memutuskan sendiri, tanpa roda. Tawarkan lebih dulu, baru
+                    munculkan special event-nya beberapa putaran kemudian.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {soalKejadian.map((s) => (
+                    {soalKeputusan.map((s) => (
                       <Tombol
                         key={s.id}
                         onClick={() => {
-                          setKendaliKhusus(false)
-                          void munculkanKejadian(s)
+                          setPanelPenawaran(false)
+                          void tawarkanAsuransi(s)
                         }}
                         sibuk={sibuk}
                       >
-                        {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)} ·{' '}
-                        {(pemegangPolis.get(s.polis ?? '') ?? []).length} terlindungi
+                        {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)}
+                        {pemegangPolis.has(s.polis ?? '') && ' · sudah ditawarkan'}
                       </Tombol>
                     ))}
                   </div>
-                </div>
+                </>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  {soalKeputusan.length === 0
+                    ? 'Tidak ada soal penawaran yang aktif. Centang dulu di tab Editor Soal.'
+                    : 'Penawaran dibuka dari fase menunggu, di sela putaran.'}
+                </p>
               )}
 
-              {state.fase !== 'menunggu' &&
-                state.fase !== 'selesai' &&
-                state.fase !== 'pilih_warna' && (
-                  <p className="text-[11px] text-slate-500">
-                    Tawaran polis dibuka dari fase menunggu, kejadian dari fase pilih warna.
-                  </p>
-                )}
-
               {pemegangPolis.size > 0 && (
-                <div className="border-t border-slate-700 pt-2">
+                <div className="mt-3 border-t border-slate-700 pt-2">
                   <p className="mb-1.5 text-xs font-semibold text-slate-300">Pemegang polis aktif</p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[...pemegangPolis.entries()].map(([polis, nama]) => (
@@ -493,6 +488,54 @@ function Dashboard() {
                     ))}
                   </div>
                 </div>
+              )}
+            </Kartu>
+          )}
+
+          {/* Special event — musibah yang ditanggung polis. Dimunculkan saat
+              peserta sudah memilih warna, supaya roda tetap yang menentukan
+              siapa tertimpa. */}
+          {panelEvent && (
+            <Kartu>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-100">💥 Special Event</p>
+                <button
+                  onClick={() => setPanelEvent(false)}
+                  className="text-[11px] text-slate-400 underline"
+                >
+                  tutup
+                </button>
+              </div>
+
+              {state.fase === 'pilih_warna' && soalKejadian.length > 0 ? (
+                <>
+                  <p className="mb-2 text-[11px] leading-relaxed text-slate-400">
+                    Menggantikan undian acak untuk putaran ini. Roda tetap berputar menentukan
+                    siapa yang tertimpa. Angka di sebelah kanan adalah jumlah peserta yang
+                    terlindungi polis.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {soalKejadian.map((s) => (
+                      <Tombol
+                        key={s.id}
+                        onClick={() => {
+                          setPanelEvent(false)
+                          void munculkanKejadian(s)
+                        }}
+                        sibuk={sibuk}
+                      >
+                        {s.polis === 'kendaraan' ? '🚗' : '🔥'} {rupiah(s.nominal)} ·{' '}
+                        {(pemegangPolis.get(s.polis ?? '') ?? []).length} terlindungi
+                      </Tombol>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  {soalKejadian.length === 0
+                    ? 'Tidak ada special event yang aktif. Centang dulu di tab Editor Soal.'
+                    : 'Special event dimunculkan saat peserta sedang memilih warna.'}
+                </p>
               )}
             </Kartu>
           )}
@@ -693,7 +736,9 @@ function Dashboard() {
           <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
             Semua buku ini seimbang — tanpa kecuali. Yang berbeda komposisinya. Dari transaksi yang
             sama persis, jurnal yang berbeda menghasilkan laporan yang berbeda. Kolom 👛 Pribadi
-            berada di luar pembukuan, jadi ia tidak muncul di Total Aset mana pun.
+            berada di luar pembukuan, jadi ia tidak muncul di Total Aset mana pun. Kekayaan Bersih
+            = Ekuitas Usaha + Dompet Pribadi — inilah yang memeringkat, bukan saldo kas, karena
+            kebakaran memusnahkan persediaan tanpa menyentuh kas sama sekali.
           </p>
           <div className="scroll-x">
             <table className="w-full min-w-[600px] text-xs">
@@ -702,7 +747,8 @@ function Dashboard() {
                   <th className="px-2 py-1.5 text-left font-medium">Nama</th>
                   <th className="px-2 py-1.5 text-right font-medium">💼 Kas Bisnis</th>
                   <th className="px-2 py-1.5 text-right font-medium">👛 Pribadi</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Total Kekayaan</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Ekuitas Usaha</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Kekayaan Bersih</th>
                   <th className="px-2 py-1.5 text-right font-medium">Total Aset</th>
                   <th className="px-2 py-1.5 text-right font-medium">Laba Bersih</th>
                   <th className="px-2 py-1.5 text-right font-medium">Akurasi</th>
@@ -722,6 +768,9 @@ function Dashboard() {
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums text-slate-400">
                       {angka(b.dompetPribadi)}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-slate-200">
+                      {angka(b.ekuitasBisnis)}
                     </td>
                     <td className="px-2 py-2 text-right font-semibold tabular-nums text-amber-300">
                       {angka(b.totalKekayaan)}

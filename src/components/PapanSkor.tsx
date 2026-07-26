@@ -27,7 +27,9 @@ export default function PapanSkor({ hasil, sorotPesertaId, batas }: Props) {
   return (
     <div>
       <p className="mb-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-[11px] leading-relaxed text-cyan-200">
-        Urutannya: <b>Nilai → Total Kekayaan → Kecepatan</b>. Nilai dihitung dari semua jawaban,
+        Urutannya: <b>Nilai → Kekayaan Bersih → Kecepatan</b>. Kekayaan Bersih = Ekuitas Usaha
+        (Aset − Kewajiban) + Dompet Pribadi, bukan saldo kas — kebakaran memusnahkan persediaan
+        tanpa menyentuh kas. Nilai dihitung dari semua jawaban,
         termasuk latihan — jadi peserta yang warnanya tidak pernah keluar tetap bisa juara lewat
         pemahamannya. Satu kesempatan per soal: 100 bila benar, 0 bila salah.
         {hasil.adaSempurna && ' 💎 menandai yang seluruh jawabannya benar.'}
@@ -40,8 +42,8 @@ export default function PapanSkor({ hasil, sorotPesertaId, batas }: Props) {
               <th className="px-2 py-1.5 text-left font-medium">#</th>
               <th className="px-2 py-1.5 text-left font-medium">Nama</th>
               <th className="px-2 py-1.5 text-right font-medium">Nilai</th>
-              <th className="px-2 py-1.5 text-right font-medium">Total Kekayaan</th>
-              <th className="px-2 py-1.5 text-right font-medium">💼 Bisnis</th>
+              <th className="px-2 py-1.5 text-right font-medium">Kekayaan Bersih</th>
+              <th className="px-2 py-1.5 text-right font-medium">💼 Ekuitas</th>
               <th className="px-2 py-1.5 text-right font-medium">👛 Pribadi</th>
               <th className="px-2 py-1.5 text-right font-medium">Dijawab</th>
               <th className="px-2 py-1.5 text-right font-medium">Giliran</th>
@@ -68,7 +70,7 @@ export default function PapanSkor({ hasil, sorotPesertaId, batas }: Props) {
                   {rupiah(b.totalKekayaan)}
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums text-slate-300">
-                  {rupiah(b.saldoKas)}
+                  {rupiah(b.ekuitasBisnis)}
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums text-slate-400">
                   {rupiah(b.dompetPribadi)}
