@@ -45,6 +45,29 @@ export interface GameState {
 export interface Peserta {
   id: string
   nama: string
+  /**
+   * Porsi dari modal awal yang peserta masukkan ke Dompet Bisnis saat mendaftar.
+   * Sisanya (MODAL_AWAL − alokasi_bisnis) menjadi isi awal Dompet Pribadi, yang
+   * berada DI LUAR pembukuan sepenuhnya.
+   */
+  alokasi_bisnis: number
+  created_at: string
+}
+
+/**
+ * Perpindahan uang antar dompet.
+ *
+ * Ini catatan FAKTA — uangnya benar-benar berpindah sebanyak ini. Jurnal yang
+ * menyertainya boleh saja salah akun, dan justru di situlah pelajarannya:
+ * uang bergerak menurut kenyataan, sedangkan laporan bergerak menurut catatan.
+ */
+export interface Mutasi {
+  id: number
+  peserta_id: string
+  /** topup = pribadi → bisnis. prive = bisnis → pribadi. */
+  arah: 'topup' | 'prive'
+  jumlah: number
+  putaran: number
   created_at: string
 }
 
@@ -69,6 +92,12 @@ export interface Jurnal {
   wajib: boolean
   waktu_jawab_ms: number | null
   diterapkan: boolean
+  /**
+   * soal      : jawaban atas soal putaran itu (satu per peserta per putaran)
+   * pembukaan : jurnal modal awal
+   * mutasi    : top up atau prive antar dompet, boleh berkali-kali per putaran
+   */
+  jenis: 'soal' | 'pembukaan' | 'mutasi'
   /**
    * Peserta menyatakan tidak ada jurnal yang perlu dicatat — jawaban yang benar
    * bagi pemegang polis saat musibah terjadi. Dibedakan dari "tidak sempat

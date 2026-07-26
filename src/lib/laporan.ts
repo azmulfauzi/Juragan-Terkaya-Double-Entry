@@ -85,9 +85,18 @@ export interface Pembukuan {
   saldo: (kode: string) => number
 }
 
-/** Keterangan baris buku besar; jurnal pembukaan tidak punya soal. */
+/** Keterangan baris buku besar; jurnal pembukaan dan mutasi tidak punya soal. */
 function keteranganJurnal(j: Jurnal, petaSoal?: Map<number, string>): string {
-  if (j.putaran === 0) return 'Setoran modal awal'
+  if (j.jenis === 'mutasi') {
+    // Arahnya dibaca dari akun yang dipilih peserta, bukan dari niatnya. Kalau
+    // jurnalnya salah, keterangannya pun ikut memperlihatkan kesalahan itu.
+    return j.akun_debit === '3-200'
+      ? 'Prive ke dompet pribadi'
+      : j.akun_kredit === '3-100'
+        ? 'Top up dari dompet pribadi'
+        : 'Perpindahan antar dompet'
+  }
+  if (j.putaran === 0 || j.jenis === 'pembukaan') return 'Setoran modal awal'
   if (j.soal_id != null) {
     const teks = petaSoal?.get(j.soal_id)
     if (teks) return teks

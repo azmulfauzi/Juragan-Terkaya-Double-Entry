@@ -1,10 +1,12 @@
 import { supabase } from './supabase'
 import { SOAL_DEFAULT } from '../data/soal'
+import { JURNAL_MUTASI, batasiAlokasi } from './dompet'
 import { validasiSoal } from './validasi'
 import type {
   GameState,
   Jurnal,
   Keputusan,
+  Mutasi,
   Peserta,
   PilihanWarna,
   Polis,
@@ -50,9 +52,16 @@ export async function resetGame(): Promise<void> {
 
 // ─────────────────────────────── PESERTA ───────────────────────────────
 
-/** Mendaftar sekaligus memposting jurnal pembukaan (dilakukan di server). */
-export async function daftarPeserta(nama: string): Promise<Peserta> {
-  const { data, error } = await supabase.rpc('daftar_peserta', { p_nama: nama.trim() })
+/**
+ * Mendaftar sekaligus memposting jurnal pembukaan (dilakukan di server).
+ * Hanya porsi Dompet Bisnis yang masuk pembukuan; sisanya menjadi isi awal
+ * Dompet Pribadi yang berada di luar buku.
+ */
+export async function daftarPeserta(nama: string, alokasiBisnis: number): Promise<Peserta> {
+  const { data, error } = await supabase.rpc('daftar_peserta', {
+    p_nama: nama.trim(),
+    p_alokasi_bisnis: batasiAlokasi(alokasiBisnis),
+  })
   return cek(data as Peserta | null, error, 'Gagal mendaftarkan peserta')
 }
 
@@ -129,10 +138,69 @@ export interface JurnalBaru {
  * bisa membacanya lewat devtools sebelum jawaban dibuka.
  */
 export async function simpanJurnal(jurnal: JurnalBaru): Promise<void> {
-  const { error } = await supabase
-    .from('jurnal')
-    .upsert(jurnal, { onConflict: 'peserta_id,putaran', ignoreDuplicates: true })
-  if (error) throw new Error(`Gagal menyimpan jurnal: ${error.message}`)
+  const { error } = await supabase.from('jurnal').insert({ ...jurnal, jenis: 'soal' })
+  // 23505 = sudah ada jurnal untuk putaran ini. Pilihan peserta memang terkunci
+  // setelah dikirim, jadi kiriman kedua cukup diabaikan diam-diam.
+  if (error && error.code !== '23505') {
+    throw new Error(`Gagal menyimpan jurnal: ${error.message}`)
+  }
+}
+
+// ────────────────────────── MUTASI ANTAR DOMPET ──────────────────────────
+
+/**
+ * Memindahkan uang antar dompet, sekaligus menjurnal sisi bisnisnya.
+ *
+ * Dua hal ditulis: baris `mutasi` sebagai catatan fakta (uangnya benar-benar
+ * berpindah sekian), dan baris `jurnal` sebagai catatan pembukuan versi peserta
+ * — yang boleh saja salah akun. Jurnalnya langsung diposting karena tidak ada
+ * benar/salah yang perlu disembunyikan: ini tindakan peserta sendiri, bukan
+ * jawaban atas soal, dan tidak dihitung dalam akurasi.
+ */
+export async function simpanMutasi(
+  pesertaId: string,
+  arah: 'topup' | 'prive',
+  jumlah: number,
+  putaran: number,
+  akunDebit: string,
+  akunKredit: string,
+): Promise<void> {
+  const { error: errMutasi } = await supabase
+    .from('mutasi')
+    .insert({ peserta_id: pesertaId, arah, jumlah, putaran })
+  if (errMutasi) throw new Error(`Gagal memindahkan uang: ${errMutasi.message}`)
+
+  const kunci = JURNAL_MUTASI[arah]
+  const { error: errJurnal } = await supabase.from('jurnal').insert({
+    peserta_id: pesertaId,
+    putaran,
+    soal_id: null,
+    akun_debit: akunDebit,
+    akun_kredit: akunKredit,
+    nominal: jumlah,
+    wajib: false, // tidak masuk hitungan akurasi
+    benar: akunDebit === kunci.debit && akunKredit === kunci.kredit,
+    diterapkan: true,
+    jenis: 'mutasi',
+  })
+  if (errJurnal) throw new Error(`Gagal mencatat jurnalnya: ${errJurnal.message}`)
+}
+
+export async function ambilSemuaMutasi(): Promise<Mutasi[]> {
+  const { data, error } = await supabase
+    .from('mutasi')
+    .select('*')
+    .order('created_at', { ascending: true })
+  return cek(data, error, 'Gagal membaca mutasi dompet')
+}
+
+export async function ambilMutasiPeserta(pesertaId: string): Promise<Mutasi[]> {
+  const { data, error } = await supabase
+    .from('mutasi')
+    .select('*')
+    .eq('peserta_id', pesertaId)
+    .order('created_at', { ascending: true })
+  return cek(data, error, 'Gagal membaca mutasi dompet')
 }
 
 export async function ambilSemuaJurnal(): Promise<Jurnal[]> {

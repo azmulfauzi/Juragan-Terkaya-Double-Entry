@@ -34,6 +34,9 @@ create table if not exists game_state (
 create table if not exists peserta (
   id          uuid        primary key default gen_random_uuid(),
   nama        text        not null,
+  -- Porsi dari Rp10.000.000 yang peserta masukkan ke Dompet Bisnis saat
+  -- mendaftar. Sisanya jadi isi awal Dompet Pribadi, DI LUAR pembukuan.
+  alokasi_bisnis bigint   not null default 10000000,
   created_at  timestamptz not null default now()
 );
 
@@ -72,8 +75,29 @@ create table if not exists jurnal (
   -- pemegang polis saat musibah terjadi. Sengaja dibedakan dari "tidak sempat
   -- mengirim" (akun kosong DAN tanpa_jurnal false), yang dihitung salah.
   tanpa_jurnal   boolean not null default false,
-  created_at     timestamptz not null default now(),
-  unique (peserta_id, putaran)
+  -- soal      : jawaban atas soal putaran itu (satu per peserta per putaran)
+  -- pembukaan : jurnal modal awal
+  -- mutasi    : top up / prive antar dompet, boleh berkali-kali per putaran
+  jenis          text    not null default 'soal',
+  created_at     timestamptz not null default now()
+);
+
+-- Satu jawaban per peserta per putaran — tapi mutasi dompet dikecualikan,
+-- karena memang boleh dilakukan berkali-kali.
+create unique index if not exists jurnal_satu_jawaban_per_putaran
+  on jurnal (peserta_id, putaran)
+  where jenis <> 'mutasi';
+
+-- Perpindahan uang antar dompet. Ini catatan FAKTA: uangnya benar-benar
+-- berpindah sebanyak ini. Jurnal yang menyertainya boleh saja salah akun, dan
+-- justru di situlah pelajarannya.
+create table if not exists mutasi (
+  id          bigserial primary key,
+  peserta_id  uuid   not null references peserta(id) on delete cascade,
+  arah        text   not null,          -- 'topup' (pribadi→bisnis) | 'prive' (bisnis→pribadi)
+  jumlah      bigint not null check (jumlah > 0),
+  putaran     int    not null default 0,
+  created_at  timestamptz not null default now()
 );
 
 -- Keputusan peserta atas penawaran asuransi. Polis berlaku sampai game selesai.
@@ -118,6 +142,7 @@ create index if not exists idx_jurnal_putaran        on jurnal (putaran);
 create index if not exists idx_jurnal_peserta        on jurnal (peserta_id);
 create index if not exists idx_keputusan_peserta     on keputusan (peserta_id);
 create index if not exists idx_keputusan_polis       on keputusan (polis);
+create index if not exists idx_mutasi_peserta        on mutasi (peserta_id);
 
 
 -- ─────────────────────── ROW LEVEL SECURITY ───────────────────────
@@ -136,13 +161,14 @@ alter table peserta       enable row level security;
 alter table pilihan_warna enable row level security;
 alter table jurnal        enable row level security;
 alter table keputusan     enable row level security;
+alter table mutasi        enable row level security;
 alter table soal          enable row level security;
 
 do $$
 declare
   t text;
 begin
-  foreach t in array array['game_state','peserta','pilihan_warna','jurnal','keputusan','soal']
+  foreach t in array array['game_state','peserta','pilihan_warna','jurnal','keputusan','mutasi','soal']
   loop
     execute format('drop policy if exists akses_publik on %I', t);
     execute format(
@@ -159,12 +185,13 @@ alter table peserta       replica identity full;
 alter table pilihan_warna replica identity full;
 alter table jurnal        replica identity full;
 alter table keputusan     replica identity full;
+alter table mutasi        replica identity full;
 
 do $$
 declare
   t text;
 begin
-  foreach t in array array['game_state','peserta','pilihan_warna','jurnal','keputusan']
+  foreach t in array array['game_state','peserta','pilihan_warna','jurnal','keputusan','mutasi']
   loop
     begin
       execute format('alter publication supabase_realtime add table %I', t);
@@ -187,6 +214,7 @@ as $$
 begin
   -- Klausa "where true" wajib ada: Supabase mengaktifkan pg_safeupdate yang
   -- menolak DELETE tanpa WHERE (error 21000) sebagai pengaman.
+  delete from mutasi        where true;
   delete from keputusan     where true;
   delete from jurnal        where true;
   delete from pilihan_warna where true;
@@ -217,26 +245,36 @@ grant execute on function reset_game() to anon, authenticated;
 -- Dibuat di server agar tidak ada peserta yang kehilangan modal awalnya karena
 -- koneksi putus di tengah pendaftaran.
 
-create or replace function daftar_peserta(p_nama text)
+drop function if exists daftar_peserta(text);
+
+create or replace function daftar_peserta(p_nama text, p_alokasi_bisnis bigint)
 returns peserta
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  baru peserta;
+  baru    peserta;
+  alokasi bigint;
 begin
-  insert into peserta (nama) values (btrim(p_nama)) returning * into baru;
+  -- Dibatasi di server juga, bukan hanya di browser: nilai di luar rentang akan
+  -- membuat Dompet Pribadi negatif sejak sebelum permainan dimulai.
+  alokasi := least(10000000, greatest(1000000, coalesce(p_alokasi_bisnis, 10000000)));
 
+  insert into peserta (nama, alokasi_bisnis)
+  values (btrim(p_nama), alokasi)
+  returning * into baru;
+
+  -- Hanya porsi bisnis yang masuk pembukuan.
   insert into jurnal (peserta_id, putaran, soal_id, akun_debit, akun_kredit,
-                      nominal, benar, wajib, diterapkan)
-  values (baru.id, 0, null, '1-100', '3-100', 10000000, true, false, true);
+                      nominal, benar, wajib, diterapkan, jenis)
+  values (baru.id, 0, null, '1-100', '3-100', alokasi, true, false, true, 'pembukaan');
 
   return baru;
 end;
 $$;
 
-grant execute on function daftar_peserta(text) to anon, authenticated;
+grant execute on function daftar_peserta(text, bigint) to anon, authenticated;
 
 
 -- ──────────────── PENILAIAN & POSTING SAAT REVEAL ────────────────
@@ -287,7 +325,8 @@ begin
        set benar      = coalesce(akun_debit = v_debit and akun_kredit = v_kredit, false),
            wajib      = false,
            diterapkan = (akun_debit is not null)
-     where putaran = p_putaran;
+     where putaran = p_putaran
+       and jenis   = 'soal';
     return;
   end if;
 
@@ -297,15 +336,17 @@ begin
 
   -- 1. Peserta wajib yang tidak mengirim jurnal sampai waktu habis.
   insert into jurnal (peserta_id, putaran, soal_id, akun_debit, akun_kredit,
-                      nominal, benar, wajib, diterapkan)
+                      nominal, benar, wajib, diterapkan, jenis)
   select pw.peserta_id, p_putaran, v_soal_id, null, null,
-         v_nominal, false, true, false
+         v_nominal, false, true, false, 'soal'
     from pilihan_warna pw
    where pw.putaran = p_putaran
      and pw.warna   = v_warna
      and not exists (
        select 1 from jurnal j
-        where j.peserta_id = pw.peserta_id and j.putaran = p_putaran
+        where j.peserta_id = pw.peserta_id
+          and j.putaran    = p_putaran
+          and j.jenis      = 'soal'
      );
 
   -- 2. Nilai seluruh jurnal putaran ini — termasuk jurnal latihan, karena
@@ -329,13 +370,15 @@ begin
                            and j.akun_debit  = v_debit
                            and j.akun_kredit = v_kredit, false)
            end
-     where j.putaran = p_putaran;
+     where j.putaran = p_putaran
+       and j.jenis   = 'soal';
   else
     update jurnal
        set benar = coalesce(tanpa_jurnal = false
                             and akun_debit  = v_debit
                             and akun_kredit = v_kredit, false)
-     where putaran = p_putaran;
+     where putaran = p_putaran
+       and jenis   = 'soal';
   end if;
 
   -- 3. Tandai siapa yang wajib, lalu posting jurnal mereka ke buku besar.
@@ -350,7 +393,8 @@ begin
     from pilihan_warna pw
    where pw.peserta_id = j.peserta_id
      and pw.putaran    = p_putaran
-     and j.putaran     = p_putaran;
+     and j.putaran     = p_putaran
+     and j.jenis       = 'soal';
 end;
 $$;
 

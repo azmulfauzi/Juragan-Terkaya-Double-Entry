@@ -20,9 +20,10 @@ dengan database yang terpisah.
 2. Buka **SQL Editor → New query**, jalankan seluruh isi [`supabase/schema.sql`](supabase/schema.sql).
    Aman dijalankan berulang kali.
 
-   > Kalau database Anda dibuat sebelum mekanik asuransi ada, jalankan juga
-   > [`supabase/migrasi-01-asuransi.sql`](supabase/migrasi-01-asuransi.sql). Untuk
-   > database baru, `schema.sql` saja sudah lengkap.
+   > Untuk database baru, `schema.sql` saja sudah lengkap. Database lama perlu
+   > menjalankan migrasinya berurutan:
+   > [`migrasi-01-asuransi.sql`](supabase/migrasi-01-asuransi.sql) lalu
+   > [`migrasi-02-dua-dompet.sql`](supabase/migrasi-02-dua-dompet.sql).
 3. Buka **Project Settings → Data API**, salin **Project URL** dan **anon key**.
 4. Salin `.env.example` menjadi `.env`, isi kedua nilai tersebut dan tentukan
    `VITE_FASILITATOR_PIN`.
@@ -93,13 +94,39 @@ mahal sampai kebakaran benar-benar terjadi.
 
 Polis berlaku sampai permainan selesai, dan ikut terhapus saat Reset.
 
+## Dua dompet
+
+Setiap peserta membagi sendiri modal awal Rp10.000.000-nya saat mendaftar:
+
+| | Masuk pembukuan? | Sifat |
+|---|---|---|
+| 💼 **Dompet Bisnis** | Ya — jurnal pembukaan `Kas (D) / Modal Pemilik (K)` | Bisa tumbuh dari penjualan, tapi terancam kerugian dan kebakaran |
+| 👛 **Dompet Pribadi** | **Tidak** — tidak pernah muncul di jurnal, neraca, maupun laba rugi | Aman sepenuhnya, tapi diam saja |
+
+Di sela putaran (saat menunggu atau setelah reveal), peserta bebas memindahkan uang:
+
+- **Top up** pribadi → bisnis, dijurnal `Kas (D) / Modal Pemilik (K)`
+- **Prive** bisnis → pribadi, dijurnal `Prive (D) / Kas (K)`
+
+Hanya sisi bisnis yang dijurnal; sisi pribadi cukup mutasi saldo. Perpindahan dibatasi isi dompet
+asalnya, dan **tidak dihitung dalam akurasi** — sama seperti keputusan asuransi.
+
+Uangnya tetap berpindah walaupun jurnalnya salah akun. Tabel `mutasi` menyimpan fakta
+perpindahannya, tabel `jurnal` menyimpan versi catatan peserta. Selisih keduanya justru bahan
+diskusi yang bagus: uang bergerak menurut kenyataan, laporan bergerak menurut catatan.
+
 ## Penentuan pemenang
 
-Akurasi adalah gerbang, saldo adalah pemeringkat:
+Akurasi adalah gerbang, kekayaan adalah pemeringkat:
 
-- Peserta yang **100% jurnalnya benar** menjadi kandidat, diurutkan berdasarkan **Saldo Kas**.
-- Kalau tidak ada yang sempurna: persentase benar → jumlah benar → rata-rata waktu → saldo kas.
+- Peserta yang **100% jurnalnya benar** menjadi kandidat, diurutkan berdasarkan
+  **Total Kekayaan** = Saldo Kas bisnis + Dompet Pribadi.
+- Kalau tidak ada yang sempurna: persentase benar → jumlah benar → rata-rata waktu → total kekayaan.
 - Akurasi hanya dihitung dari putaran saat peserta berstatus **wajib**.
+
+Dua dompet dijumlahkan supaya keputusan alokasi di awal jadi taruhan yang sesungguhnya. Kalau
+hanya kas bisnis yang dihitung, semua peserta akan menaruh 10 juta penuh di bisnis dan pilihan
+dompetnya kehilangan makna.
 
 Kenapa bukan saldo saja: jurnal yang salah tetap diposting, dan kesalahan bisa membuat kas terlihat
 lebih besar. Pembelian tunai yang salah dikreditkan ke Hutang Usaha membuat kas tidak berkurang —
@@ -126,6 +153,7 @@ src/
     laporan.ts    ★ Mesin pembukuan — modul murni, satu-satunya tempat rumus laporan
     peringkat.ts  ★ Aturan penentuan pemenang
     undian.ts     ★ Undian soal & roda warna (keduanya sengaja saling lepas)
+    dompet.ts     ★ Dua dompet: saldo pribadi, batas alokasi, jurnal mutasi
     validasi.ts   Aturan sahnya sebuah soal
     api.ts        Seluruh akses Supabase
     hooks.ts      Realtime + polling cadangan + timer terselaraskan jam server
@@ -137,6 +165,7 @@ src/
 supabase/
   schema.sql                Tabel, RLS, realtime, fungsi reset/penilaian/waktu server
   migrasi-01-asuransi.sql   Tambahan mekanik asuransi untuk database lama
+  migrasi-02-dua-dompet.sql Tambahan dua dompet untuk database lama
 uji/              Uji tanpa kerangka tambahan (npm run uji)
 ```
 

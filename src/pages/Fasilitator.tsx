@@ -10,6 +10,7 @@ import TimerRing from '../components/TimerRing'
 import {
   ambilSemuaJurnal,
   ambilSemuaKeputusan,
+  ambilSemuaMutasi,
   ambilSemuaPeserta,
   ambilSemuaPilihanWarna,
   resetGame,
@@ -31,7 +32,7 @@ import { useGameState, useRealtimeTabel, useSisaWaktu } from '../lib/hooks'
 import { hitungPeringkat } from '../lib/peringkat'
 import { sekarang } from '../lib/waktu'
 import { useVersiKedaluwarsa } from '../lib/versi'
-import type { Jurnal, Keputusan, Peserta, PilihanWarna, Soal } from '../lib/types'
+import type { Jurnal, Keputusan, Mutasi, Peserta, PilihanWarna, Soal } from '../lib/types'
 
 type Tab = 'kendali' | 'pembukuan' | 'perbandingan' | 'skor' | 'editor'
 
@@ -63,6 +64,7 @@ function Dashboard() {
   const [jurnal, setJurnal] = useState<Jurnal[]>([])
   const [warna, setWarna] = useState<PilihanWarna[]>([])
   const [keputusan, setKeputusan] = useState<Keputusan[]>([])
+  const [mutasi, setMutasi] = useState<Mutasi[]>([])
   const [daftarSoal, setDaftarSoal] = useState<Soal[]>([])
   const [galat, setGalat] = useState<string | null>(null)
   const [sibuk, setSibuk] = useState(false)
@@ -70,16 +72,18 @@ function Dashboard() {
 
   const muat = useCallback(async () => {
     try {
-      const [p, j, w, k] = await Promise.all([
+      const [p, j, w, k, m] = await Promise.all([
         ambilSemuaPeserta(),
         ambilSemuaJurnal(),
         ambilSemuaPilihanWarna(),
         ambilSemuaKeputusan(),
+        ambilSemuaMutasi(),
       ])
       setPeserta(p)
       setJurnal(j)
       setWarna(w)
       setKeputusan(k)
+      setMutasi(m)
     } catch (e) {
       setGalat(e instanceof Error ? e.message : String(e))
     }
@@ -92,7 +96,7 @@ function Dashboard() {
       .catch((e) => setGalat(e instanceof Error ? e.message : String(e)))
   }, [muat])
 
-  useRealtimeTabel(['peserta', 'jurnal', 'pilihan_warna', 'keputusan'], muat)
+  useRealtimeTabel(['peserta', 'jurnal', 'pilihan_warna', 'keputusan', 'mutasi'], muat)
 
   const petaSoal = useMemo(
     () => new Map(daftarSoal.map((s) => [s.id, s.teks])),
@@ -100,8 +104,8 @@ function Dashboard() {
   )
 
   const peringkat = useMemo(
-    () => hitungPeringkat(peserta, jurnal, petaSoal),
-    [peserta, jurnal, petaSoal],
+    () => hitungPeringkat(peserta, jurnal, mutasi, petaSoal),
+    [peserta, jurnal, mutasi, petaSoal],
   )
 
   const soalAktif = useMemo(
@@ -644,14 +648,17 @@ function Dashboard() {
           <p className="mb-1 text-sm font-semibold text-slate-100">Perbandingan antar peserta</p>
           <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
             Semua buku ini seimbang — tanpa kecuali. Yang berbeda komposisinya. Dari transaksi yang
-            sama persis, jurnal yang berbeda menghasilkan laporan yang berbeda.
+            sama persis, jurnal yang berbeda menghasilkan laporan yang berbeda. Kolom 👛 Pribadi
+            berada di luar pembukuan, jadi ia tidak muncul di Total Aset mana pun.
           </p>
           <div className="scroll-x">
             <table className="w-full min-w-[600px] text-xs">
               <thead>
                 <tr className="text-slate-400">
                   <th className="px-2 py-1.5 text-left font-medium">Nama</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Saldo Kas</th>
+                  <th className="px-2 py-1.5 text-right font-medium">💼 Kas Bisnis</th>
+                  <th className="px-2 py-1.5 text-right font-medium">👛 Pribadi</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Total Kekayaan</th>
                   <th className="px-2 py-1.5 text-right font-medium">Total Aset</th>
                   <th className="px-2 py-1.5 text-right font-medium">Laba Bersih</th>
                   <th className="px-2 py-1.5 text-right font-medium">Akurasi</th>
@@ -668,6 +675,12 @@ function Dashboard() {
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums text-slate-200">
                       {angka(b.saldoKas)}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-slate-400">
+                      {angka(b.dompetPribadi)}
+                    </td>
+                    <td className="px-2 py-2 text-right font-semibold tabular-nums text-amber-300">
+                      {angka(b.totalKekayaan)}
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums text-slate-200">
                       {angka(b.totalAset)}

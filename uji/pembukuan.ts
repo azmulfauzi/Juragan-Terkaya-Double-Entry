@@ -5,9 +5,10 @@
  * murni (tanpa React, tanpa jaringan) supaya bisa diuji seperti ini — angka di
  * HP peserta dan di layar fasilitator berasal dari fungsi yang sama persis.
  */
+import { saldoPribadi } from '../src/lib/dompet'
 import { susunPembukuan } from '../src/lib/laporan'
 import { hitungPeringkat } from '../src/lib/peringkat'
-import type { Jurnal, Peserta } from '../src/lib/types'
+import type { Jurnal, Mutasi, Peserta } from '../src/lib/types'
 
 export let gagal = 0
 function cek(nama: string, aktual: unknown, harapan: unknown) {
@@ -38,12 +39,14 @@ function j(
     waktu_jawab_ms: 5000,
     diterapkan: true,
     tanpa_jurnal: false,
+    jenis: 'soal',
     created_at: '',
     ...extra,
   }
 }
 
-const pembukaan = (p: string) => j(p, 0, '1-100', '3-100', 10_000_000, { wajib: false, benar: true })
+const pembukaan = (p: string, nilai = 10_000_000) =>
+  j(p, 0, '1-100', '3-100', nilai, { wajib: false, benar: true, jenis: 'pembukaan' })
 
 // 1. Hanya jurnal pembukaan
 {
@@ -109,7 +112,12 @@ const pembukaan = (p: string) => j(p, 0, '1-100', '3-100', 10_000_000, { wajib: 
 
 // 7. Gerbang akurasi: yang 100% benar menang walau kasnya lebih kecil
 {
-  const orang = (id: string, nama: string): Peserta => ({ id, nama, created_at: '' })
+  const orang = (id: string, nama: string): Peserta => ({
+    id,
+    nama,
+    alokasi_bisnis: 10_000_000,
+    created_at: '',
+  })
   const daftar = [orang('p1', 'Ani'), orang('p2', 'Budi'), orang('p3', 'Cici')]
   const jurnal: Jurnal[] = [
     pembukaan('p1'),
@@ -125,7 +133,7 @@ const pembukaan = (p: string) => j(p, 0, '1-100', '3-100', 10_000_000, { wajib: 
     j('p3', 1, '1-100', '4-100', 9_000_000, { wajib: false, benar: true, diterapkan: false }),
   ]
 
-  const hasil = hitungPeringkat(daftar, jurnal)
+  const hasil = hitungPeringkat(daftar, jurnal, [])
   cek('peringkat: ada kandidat sempurna', hasil.adaSempurna, true)
   cek('peringkat: juara', hasil.baris[0].peserta.nama, 'Ani')
   cek('peringkat: kas juara lebih kecil dari Budi', hasil.baris[0].saldoKas < 10_000_000, true)
@@ -140,4 +148,68 @@ const pembukaan = (p: string) => j(p, 0, '1-100', '3-100', 10_000_000, { wajib: 
     hasil.baris[hasil.baris.length - 1].peserta.nama,
     'Cici',
   )
+}
+
+// 8. Dua dompet: uang pribadi berada di luar pembukuan
+{
+  let idMutasi = 0
+  const m = (pesertaId: string, arah: 'topup' | 'prive', jumlah: number): Mutasi => ({
+    id: ++idMutasi,
+    peserta_id: pesertaId,
+    arah,
+    jumlah,
+    putaran: 1,
+    created_at: '',
+  })
+
+  // Alokasi 6jt ke bisnis → dompet pribadi berisi 4jt.
+  cek('dompet: isi awal pribadi', saldoPribadi(6_000_000, []), 4_000_000)
+  cek('dompet: top up mengurangi pribadi', saldoPribadi(6_000_000, [m('a', 'topup', 1_500_000)]), 2_500_000)
+  cek('dompet: prive menambah pribadi', saldoPribadi(6_000_000, [m('a', 'prive', 2_000_000)]), 6_000_000)
+  cek(
+    'dompet: campuran topup dan prive',
+    saldoPribadi(6_000_000, [m('a', 'topup', 1_000_000), m('a', 'prive', 500_000)]),
+    3_500_000,
+  )
+
+  // Jurnal mutasi tetap masuk buku besar seperti jurnal lain.
+  const bukuTopUp = susunPembukuan([
+    pembukaan('a', 6_000_000),
+    j('a', 1, '1-100', '3-100', 1_500_000, { jenis: 'mutasi', wajib: false, benar: true }),
+  ])
+  cek('dompet: top up menambah kas bisnis', bukuTopUp.saldoKas, 7_500_000)
+  cek('dompet: modal ikut bertambah', bukuTopUp.neraca.modalPemilik, 7_500_000)
+  cek('dompet: neraca tetap seimbang', bukuTopUp.neraca.seimbang, true)
+}
+
+// 9. Peringkat memakai TOTAL kekayaan, bukan kas bisnis saja
+{
+  const orang = (id: string, nama: string, alokasi: number): Peserta => ({
+    id,
+    nama,
+    alokasi_bisnis: alokasi,
+    created_at: '',
+  })
+
+  // Dina menaruh 4jt di bisnis dan menyimpan 6jt di dompet pribadi.
+  // Eko menaruh seluruhnya di bisnis, lalu kena beban sewa 3jt.
+  const daftar = [orang('d', 'Dina', 4_000_000), orang('e', 'Eko', 10_000_000)]
+  const jurnal: Jurnal[] = [
+    pembukaan('d', 4_000_000),
+    pembukaan('e', 10_000_000),
+    j('d', 1, '1-100', '4-100', 1_000_000, { benar: true }),
+    j('e', 1, '5-300', '1-100', 3_000_000, { benar: true }),
+  ]
+
+  const hasil = hitungPeringkat(daftar, jurnal, [])
+  const dina = hasil.baris.find((b) => b.peserta.nama === 'Dina')!
+  const eko = hasil.baris.find((b) => b.peserta.nama === 'Eko')!
+
+  cek('dua dompet: kas bisnis Dina', dina.saldoKas, 5_000_000)
+  cek('dua dompet: dompet pribadi Dina', dina.dompetPribadi, 6_000_000)
+  cek('dua dompet: total kekayaan Dina', dina.totalKekayaan, 11_000_000)
+  cek('dua dompet: kas bisnis Eko lebih besar', eko.saldoKas > dina.saldoKas, true)
+  cek('dua dompet: total kekayaan Eko', eko.totalKekayaan, 7_000_000)
+  cek('dua dompet: juara ditentukan total, bukan kas', hasil.baris[0].peserta.nama, 'Dina')
+  cek('dua dompet: pribadi tidak masuk total aset', dina.totalAset, 5_000_000)
 }

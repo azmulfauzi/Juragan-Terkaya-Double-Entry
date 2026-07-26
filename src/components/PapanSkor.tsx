@@ -28,19 +28,22 @@ export default function PapanSkor({ hasil, sorotPesertaId, batas }: Props) {
     <div>
       {hasil.adaSempurna && (
         <p className="mb-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-[11px] leading-relaxed text-cyan-200">
-          💎 Peserta berakurasi 100% adalah kandidat pemenang, diurutkan berdasarkan Saldo Kas.
-          Peserta di luar kelompok itu tidak bisa menang berapa pun saldonya — jurnal yang salah
-          bisa membuat kas terlihat lebih besar justru karena keliru.
+          💎 Peserta berakurasi 100% adalah kandidat pemenang, diurutkan berdasarkan Total
+          Kekayaan (kas bisnis + dompet pribadi). Peserta di luar kelompok itu tidak bisa menang
+          berapa pun kekayaannya — jurnal yang salah bisa membuat kas terlihat lebih besar justru
+          karena keliru.
         </p>
       )}
 
       <div className="scroll-x">
-        <table className="w-full min-w-[520px] text-xs">
+        <table className="w-full min-w-[680px] text-xs">
           <thead>
             <tr className="text-slate-400">
               <th className="px-2 py-1.5 text-left font-medium">#</th>
               <th className="px-2 py-1.5 text-left font-medium">Nama</th>
-              <th className="px-2 py-1.5 text-right font-medium">Saldo Kas</th>
+              <th className="px-2 py-1.5 text-right font-medium">Total Kekayaan</th>
+              <th className="px-2 py-1.5 text-right font-medium">💼 Bisnis</th>
+              <th className="px-2 py-1.5 text-right font-medium">👛 Pribadi</th>
               <th className="px-2 py-1.5 text-right font-medium">Benar</th>
               <th className="px-2 py-1.5 text-right font-medium">Akurasi</th>
               <th className="px-2 py-1.5 text-right font-medium">Giliran</th>
@@ -60,8 +63,14 @@ export default function PapanSkor({ hasil, sorotPesertaId, batas }: Props) {
                   {b.peserta.nama}
                   {b.sempurna && <span className="ml-1" title="Akurasi 100%">💎</span>}
                 </td>
-                <td className="px-2 py-2 text-right tabular-nums text-slate-100">
+                <td className="px-2 py-2 text-right font-semibold tabular-nums text-amber-300">
+                  {rupiah(b.totalKekayaan)}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-slate-300">
                   {rupiah(b.saldoKas)}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-slate-400">
+                  {rupiah(b.dompetPribadi)}
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums text-slate-300">
                   {b.jumlahBenar}/{b.jumlahWajib}

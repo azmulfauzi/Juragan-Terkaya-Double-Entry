@@ -8,14 +8,19 @@
  * menjawab benar. Kalau peringkat murni memakai saldo, peserta paling ceroboh
  * justru berpeluang menang. Gerbang akurasi 100% menutup celah ini sepenuhnya.
  */
+import { saldoPribadi } from './dompet'
 import { susunPembukuan, susunPembukuanSemua } from './laporan'
 import type { Pembukuan } from './laporan'
-import type { Jurnal, Peserta } from './types'
+import type { Jurnal, Mutasi, Peserta } from './types'
 
 export interface StatPeserta {
   peserta: Peserta
   pembukuan: Pembukuan
   saldoKas: number
+  /** Uang di luar pembukuan. Aman dari kerugian usaha, tapi juga tidak tumbuh. */
+  dompetPribadi: number
+  /** Saldo Kas bisnis + Dompet Pribadi — inilah pemeringkat sesungguhnya. */
+  totalKekayaan: number
   totalAset: number
   labaBersih: number
   /** Jumlah putaran saat peserta berstatus wajib (giliran sesungguhnya). */
@@ -56,13 +61,14 @@ function bandingUmum(a: StatPeserta, b: StatPeserta): number {
   const waktuB = b.rataWaktuMs ?? Number.POSITIVE_INFINITY
   if (waktuA !== waktuB) return waktuA - waktuB
 
-  // 4. Saldo Kas tertinggi.
-  return b.saldoKas - a.saldoKas
+  // 4. Total kekayaan tertinggi (kas bisnis + dompet pribadi).
+  return b.totalKekayaan - a.totalKekayaan
 }
 
 export function hitungPeringkat(
   daftarPeserta: Peserta[],
   jurnal: Jurnal[],
+  mutasi: Mutasi[] = [],
   petaSoal?: Map<number, string>,
 ): HasilPeringkat {
   const pembukuanSemua = susunPembukuanSemua(jurnal, petaSoal)
@@ -77,9 +83,17 @@ export function hitungPeringkat(
     else perPeserta.set(j.peserta_id, [j])
   }
 
+  const mutasiPer = new Map<string, Mutasi[]>()
+  for (const m of mutasi) {
+    const daftar = mutasiPer.get(m.peserta_id)
+    if (daftar) daftar.push(m)
+    else mutasiPer.set(m.peserta_id, [m])
+  }
+
   const baris: StatPeserta[] = daftarPeserta.map((peserta) => {
     const pembukuan = pembukuanSemua.get(peserta.id) ?? pembukuanKosong
     const milik = perPeserta.get(peserta.id) ?? []
+    const dompetPribadi = saldoPribadi(peserta.alokasi_bisnis, mutasiPer.get(peserta.id) ?? [])
 
     // Hanya giliran wajib yang dihitung. Jurnal latihan tidak ikut, baik
     // menambah maupun mengurangi (PRD bagian 8).
@@ -95,6 +109,8 @@ export function hitungPeringkat(
       peserta,
       pembukuan,
       saldoKas: pembukuan.saldoKas,
+      dompetPribadi,
+      totalKekayaan: pembukuan.saldoKas + dompetPribadi,
       totalAset: pembukuan.totalAset,
       labaBersih: pembukuan.labaBersih,
       jumlahWajib,
@@ -108,10 +124,14 @@ export function hitungPeringkat(
   const sempurna = baris.filter((b) => b.sempurna)
   const sisanya = baris.filter((b) => !b.sempurna)
 
-  // Tahap 1: kandidat sempurna diurutkan murni berdasarkan Saldo Kas.
+  // Tahap 1: kandidat sempurna diurutkan murni berdasarkan total kekayaan.
+  //
+  // Dua dompet dijumlahkan supaya keputusan alokasi di awal menjadi taruhan
+  // yang sesungguhnya: uang di bisnis bisa tumbuh dari penjualan tapi terancam
+  // kebakaran dan salah jurnal, uang di dompet pribadi aman tapi diam saja.
   sempurna.sort(
     (a, b) =>
-      b.saldoKas - a.saldoKas ||
+      b.totalKekayaan - a.totalKekayaan ||
       (a.rataWaktuMs ?? Number.POSITIVE_INFINITY) - (b.rataWaktuMs ?? Number.POSITIVE_INFINITY),
   )
   // Tahap 2: sisanya (dan seluruh peserta bila tidak ada yang sempurna).

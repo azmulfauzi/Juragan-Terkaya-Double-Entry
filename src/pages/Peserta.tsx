@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { Link } from 'react-router-dom'
 import BannerVersi from '../components/BannerVersi'
+import Dompet from '../components/Dompet'
 import Pembukuan from '../components/Pembukuan'
 import SpinWheel from '../components/SpinWheel'
 import TimerRing from '../components/TimerRing'
@@ -16,6 +17,7 @@ import {
   ambilJudulSoal,
   ambilJurnalPeserta,
   ambilKeputusanPeserta,
+  ambilMutasiPeserta,
   ambilPeserta,
   ambilPilihanWarnaSaya,
   ambilSoalLengkap,
@@ -44,12 +46,14 @@ import {
   useRealtimeTabel,
   useSisaWaktu,
 } from '../lib/hooks'
+import { ALOKASI_BISNIS_MIN, batasiAlokasi, saldoPribadi } from '../lib/dompet'
 import { susunPembukuan } from '../lib/laporan'
 import { lamaJawabMs } from '../lib/waktu'
 import { useVersiKedaluwarsa } from '../lib/versi'
 import type {
   Jurnal,
   Keputusan,
+  Mutasi,
   Peserta as TipePeserta,
   PilihanWarna,
   Polis,
@@ -66,6 +70,7 @@ export default function Peserta() {
   const [memuatPeserta, setMemuatPeserta] = useState(true)
   const [jurnalSaya, setJurnalSaya] = useState<Jurnal[]>([])
   const [keputusanSaya, setKeputusanSaya] = useState<Keputusan[]>([])
+  const [mutasiSaya, setMutasiSaya] = useState<Mutasi[]>([])
   const [pilihanSaya, setPilihanSaya] = useState<PilihanWarna | null>(null)
   const [soal, setSoal] = useState<SoalTanpaKunci | null>(null)
   const [soalLengkap, setSoalLengkap] = useState<Soal | null>(null)
@@ -93,12 +98,14 @@ export default function Peserta() {
   const muatJurnal = useCallback(async () => {
     if (!peserta) return
     try {
-      const [j, k] = await Promise.all([
+      const [j, k, m] = await Promise.all([
         ambilJurnalPeserta(peserta.id),
         ambilKeputusanPeserta(peserta.id),
+        ambilMutasiPeserta(peserta.id),
       ])
       setJurnalSaya(j)
       setKeputusanSaya(k)
+      setMutasiSaya(m)
     } catch (e) {
       setGalat(e instanceof Error ? e.message : String(e))
     }
@@ -107,7 +114,7 @@ export default function Peserta() {
   useEffect(() => {
     void muatJurnal()
   }, [muatJurnal])
-  useRealtimeTabel(['jurnal', 'keputusan'], muatJurnal)
+  useRealtimeTabel(['jurnal', 'keputusan', 'mutasi'], muatJurnal)
 
   // Hanya teks soal yang benar-benar ada di pembukuannya sendiri.
   const idSoalSaya = useMemo(
@@ -159,6 +166,9 @@ export default function Peserta() {
 
   const polisSaya = useMemo(() => polisAktif(keputusanSaya), [keputusanSaya])
 
+  const dompetPribadi = peserta ? saldoPribadi(peserta.alokasi_bisnis, mutasiSaya) : 0
+  const totalKekayaan = buku.saldoKas + dompetPribadi
+
   const keputusanPutaranIni = useMemo(
     () => keputusanSaya.find((k) => k.putaran === putaran) ?? null,
     [keputusanSaya, putaran],
@@ -204,13 +214,13 @@ export default function Peserta() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">Saldo Kas</p>
+            <p className="text-[10px] uppercase tracking-wide text-slate-400">Total Kekayaan</p>
             <p
               className={`tabular-nums text-lg font-bold ${
-                buku.saldoKas < 0 ? 'text-red-400' : 'text-amber-300'
+                totalKekayaan < 0 ? 'text-red-400' : 'text-amber-300'
               }`}
             >
-              {rupiah(buku.saldoKas)}
+              {rupiah(totalKekayaan)}
             </p>
           </div>
         </div>
@@ -228,6 +238,24 @@ export default function Peserta() {
             </span>
           ))}
         </div>
+      </div>
+
+      <div className="mb-3">
+        <Dompet
+          pesertaId={peserta.id}
+          alokasiBisnis={peserta.alokasi_bisnis}
+          mutasi={mutasiSaya}
+          saldoKasBisnis={buku.saldoKas}
+          putaran={putaran}
+          bolehPindah={
+            !state ||
+            state.fase === 'menunggu' ||
+            state.fase === 'selesai' ||
+            state.reveal === true
+          }
+          onSelesai={muatJurnal}
+          onGalat={setGalat}
+        />
       </div>
 
       {galat && (
@@ -314,17 +342,24 @@ export default function Peserta() {
 
 // ───────────────────────────── PENDAFTARAN ─────────────────────────────
 
+const PILIHAN_CEPAT = [10_000_000, 7_500_000, 5_000_000, 2_500_000]
+
 function FormDaftar({ onDaftar }: { onDaftar: (p: TipePeserta) => void }) {
   const [nama, setNama] = useState('')
+  const [alokasiTeks, setAlokasiTeks] = useState(String(MODAL_AWAL))
   const [sibuk, setSibuk] = useState(false)
   const [galat, setGalat] = useState<string | null>(null)
 
+  const alokasi = Math.round(Number(alokasiTeks.replace(/[^\d]/g, '')) || 0)
+  const sah = alokasi >= ALOKASI_BISNIS_MIN && alokasi <= MODAL_AWAL
+  const pribadi = MODAL_AWAL - alokasi
+
   async function kirim(e: FormEvent) {
     e.preventDefault()
-    if (!nama.trim()) return
+    if (!nama.trim() || !sah) return
     setSibuk(true)
     try {
-      onDaftar(await daftarPeserta(nama))
+      onDaftar(await daftarPeserta(nama, batasiAlokasi(alokasi)))
     } catch (err) {
       setGalat(err instanceof Error ? err.message : String(err))
     } finally {
@@ -338,7 +373,7 @@ function FormDaftar({ onDaftar }: { onDaftar: (p: TipePeserta) => void }) {
         <div className="mb-5 text-center">
           <div className="mb-2 text-4xl">📒</div>
           <h1 className="text-xl font-bold text-slate-100">Daftar Peserta</h1>
-          <p className="mt-1 text-sm text-slate-400">Cukup nama aslimu, tanpa akun.</p>
+          <p className="mt-1 text-sm text-slate-400">Nama, lalu bagi modal awalmu.</p>
         </div>
 
         <input
@@ -350,19 +385,83 @@ function FormDaftar({ onDaftar }: { onDaftar: (p: TipePeserta) => void }) {
           className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-center text-lg text-slate-100 outline-none focus:border-amber-400"
         />
 
-        <div className="mt-4 rounded-xl border border-slate-700 bg-slate-800/50 p-3 text-xs leading-relaxed text-slate-300">
-          <p className="mb-1 font-semibold text-slate-100">Modal awalmu {rupiah(MODAL_AWAL)}</p>
-          <p>Begitu mendaftar, jurnal pembukaan ini otomatis tercatat di bukumu:</p>
-          <div className="mt-2 space-y-0.5 font-mono text-[11px]">
-            <div className="flex justify-between">
-              <span>Kas (1-100)</span>
-              <span className="tabular-nums">10.000.000</span>
-            </div>
-            <div className="flex justify-between pl-4 text-slate-400">
-              <span>Modal Pemilik (3-100)</span>
-              <span className="tabular-nums">10.000.000</span>
-            </div>
+        <div className="mt-4 rounded-xl border border-slate-700 bg-slate-800/50 p-3">
+          <p className="text-xs font-semibold text-slate-100">
+            Modal awalmu {rupiah(MODAL_AWAL)} — bagi ke dua dompet
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+            Uang di Dompet Bisnis bisa tumbuh dari penjualan, tapi ikut terancam kerugian dan
+            kebakaran. Uang di Dompet Pribadi aman, tapi diam saja. Pemenang dinilai dari{' '}
+            <b>jumlah keduanya</b>.
+          </p>
+
+          <p className="mt-3 text-[10px] uppercase tracking-wide text-amber-300/80">
+            Masuk ke Dompet Bisnis
+          </p>
+          <input
+            inputMode="numeric"
+            value={alokasiTeks}
+            onChange={(e) => setAlokasiTeks(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-center text-base tabular-nums text-slate-100 outline-none focus:border-amber-400"
+          />
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {PILIHAN_CEPAT.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setAlokasiTeks(String(n))}
+                className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                  alokasi === n
+                    ? 'bg-amber-500 text-slate-900'
+                    : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                }`}
+              >
+                {rupiah(n)}
+              </button>
+            ))}
           </div>
+
+          {sah ? (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2">
+                  <p className="text-[10px] text-amber-300/80">💼 Bisnis</p>
+                  <p className="tabular-nums text-sm font-bold text-amber-300">
+                    {rupiah(alokasi)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-600 bg-slate-900/60 p-2">
+                  <p className="text-[10px] text-slate-400">👛 Pribadi</p>
+                  <p className="tabular-nums text-sm font-bold text-slate-200">
+                    {rupiah(pribadi)}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-3 text-[11px] text-slate-400">
+                Hanya porsi bisnis yang masuk pembukuan. Jurnal pembukaanmu:
+              </p>
+              <div className="mt-1 space-y-0.5 font-mono text-[11px]">
+                <div className="flex justify-between text-slate-200">
+                  <span>Kas (1-100)</span>
+                  <span className="tabular-nums">{alokasi.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between pl-4 text-slate-400">
+                  <span>Modal Pemilik (3-100)</span>
+                  <span className="tabular-nums">{alokasi.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+              <p className="mt-2 text-[10px] text-slate-500">
+                Dompet Pribadi tidak pernah muncul di jurnal. Nanti kamu bebas memindahkan uang
+                antar dompet di sela putaran.
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-center text-[11px] text-red-400">
+              Isi antara {rupiah(ALOKASI_BISNIS_MIN)} dan {rupiah(MODAL_AWAL)} — usaha tidak bisa
+              jalan tanpa modal sama sekali.
+            </p>
+          )}
         </div>
 
         {galat && (
@@ -373,7 +472,7 @@ function FormDaftar({ onDaftar }: { onDaftar: (p: TipePeserta) => void }) {
 
         <button
           type="submit"
-          disabled={sibuk || !nama.trim()}
+          disabled={sibuk || !nama.trim() || !sah}
           className="mt-4 w-full rounded-xl bg-amber-500 py-3 font-bold text-slate-900 transition hover:bg-amber-400 active:scale-[.98] disabled:opacity-40"
         >
           {sibuk ? 'Mendaftarkan…' : 'Mulai Main'}
