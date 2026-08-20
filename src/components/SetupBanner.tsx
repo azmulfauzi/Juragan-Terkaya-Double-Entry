@@ -20,7 +20,7 @@ export default function SetupBanner() {
             >
               supabase.com/dashboard
             </a>{' '}
-            — jangan pakai project Juragan Terkaya v1, strukturnya berbeda total.
+            — jangan pakai project game sebelumnya, strukturnya berbeda total.
           </li>
           <li>
             Buka <b>SQL Editor</b>, jalankan seluruh isi file{' '}

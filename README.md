@@ -1,4 +1,4 @@
-# Juragan Terkaya: Double Entry
+# Games Interaktif Akuntansi
 
 Game edukasi menyusun **jurnal double-entry** untuk sesi training akuntansi UMKM Sanggabiz.
 Peserta memilih akun Debit dan akun Kredit setiap transaksi, lalu jurnalnya langsung mengalir ke
@@ -8,7 +8,7 @@ pembukuannya sendiri:
 Jurnal  →  Buku Besar  →  Neraca Saldo  →  Neraca + Laba Rugi
 ```
 
-Ini aplikasi **mandiri**, bukan pengembangan dari Juragan Terkaya v1. Keduanya berjalan sendiri-sendiri
+Ini aplikasi **mandiri**, bukan pengembangan dari game literasi keuangan sebelumnya. Keduanya berjalan sendiri-sendiri
 dengan database yang terpisah.
 
 ---
@@ -16,7 +16,7 @@ dengan database yang terpisah.
 ## Menyiapkan (sekali saja)
 
 1. **Buat project Supabase baru** di [supabase.com/dashboard](https://supabase.com/dashboard).
-   Jangan pakai project v1 — nama tabelnya mirip tapi strukturnya berbeda total.
+   Jangan pakai project game sebelumnya — nama tabelnya mirip tapi strukturnya berbeda total.
 2. Buka **SQL Editor → New query**, jalankan seluruh isi [`supabase/schema.sql`](supabase/schema.sql).
    Aman dijalankan berulang kali.
 
@@ -40,7 +40,7 @@ npm install
 npm run dev
 ```
 
-Bank soal (44 kasus) terisi otomatis dari `src/data/soal.ts` saat halaman fasilitator dibuka
+Bank soal (61 kasus) terisi otomatis dari `src/data/soal.ts` saat halaman fasilitator dibuka
 pertama kali. Setelah itu bank soal hidup di database dan diedit lewat UI.
 
 ## Memilih soal yang dipakai
@@ -91,15 +91,13 @@ Dua jenis putaran khusus, dimunculkan lewat tombol tersendiri — bukan undian a
 
 **🛡️ Tawaran asuransi** (dari fase menunggu). **Seluruh** peserta memutuskan beli atau tidak,
 tanpa roda dan tanpa status wajib. Yang membeli harus menjurnal preminya sendiri
-(`Asuransi Dibayar Dimuka (D) / Kas (K)`) — polis baru tercatat saat jurnalnya terkirim, supaya
-tidak ada yang mendapat perlindungan tanpa kasnya berkurang. Putaran ini **tidak dihitung dalam
-akurasi**: ini keputusan strategi, bukan ujian.
+(`Beban Asuransi (D) / Kas (K)`) — polis tercatat begitu keputusannya dikirim. Jurnalnya
+dinilai 100/0 seperti soal biasa, dan yang salah bisa membetulkan pembukuannya setelah reveal.
 
 **💥 Musibah** (dari fase pilih warna, menggantikan undian acak). Roda tetap menentukan siapa yang
 tertimpa. Peserta yang punya polis cocok **tidak menjurnal apa pun** — mereka menekan tombol
 "Tidak ada jurnal". Yang tidak berasuransi mencatat kerugiannya sendiri
-(`Beban Lain-lain (D) / Persediaan atau Peralatan (K)`). Putaran ini **dihitung normal** dalam
-akurasi.
+(`Beban Lain-lain (D) / Persediaan atau Peralatan (K)`). Putaran ini dinilai normal.
 
 Urutan yang disarankan: tawarkan asuransi di awal, jalankan beberapa putaran biasa, baru
 munculkan musibahnya. Bandingkan Neraca dua peserta di tab Perbandingan — premi selalu terasa
@@ -113,7 +111,7 @@ Setiap peserta membagi sendiri modal awal Rp10.000.000-nya saat mendaftar:
 
 | | Masuk pembukuan? | Sifat |
 |---|---|---|
-| 💼 **Dompet Bisnis** | Ya — jurnal pembukaan `Kas (D) / Modal Pemilik (K)` | Bisa tumbuh dari penjualan, tapi terancam kerugian dan kebakaran |
+| 💼 **Dompet Bisnis** | Ya — jurnal pembukaan `Kas (D) / Modal Pemilik (K)` | Ikut bergerak mengikuti jalannya usaha |
 | 👛 **Dompet Pribadi** | **Tidak** — tidak pernah muncul di jurnal, neraca, maupun laba rugi | Aman sepenuhnya, tapi diam saja |
 
 Di sela putaran (saat menunggu atau setelah reveal), peserta bebas memindahkan uang:

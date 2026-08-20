@@ -8,7 +8,7 @@ export default function Home() {
       <div className="w-full max-w-lg">
         <div className="mb-6 text-center">
           <div className="mb-2 text-5xl">📒</div>
-          <h1 className="text-2xl font-bold text-slate-100">Juragan Terkaya</h1>
+          <h1 className="text-2xl font-bold text-slate-100">Games Interaktif Akuntansi</h1>
           <p className="text-lg font-semibold text-amber-400">Double Entry</p>
           <p className="mt-2 text-sm text-slate-400">
             Game menyusun jurnal dua sisi — dan melihat langsung bagaimana catatanmu berubah

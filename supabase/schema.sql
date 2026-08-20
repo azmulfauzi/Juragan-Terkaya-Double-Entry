@@ -1,8 +1,8 @@
 -- ============================================================================
---  JURAGAN TERKAYA: DOUBLE ENTRY — Skema Database Supabase
+--  GAMES INTERAKTIF AKUNTANSI — Skema Database Supabase
 -- ============================================================================
 --  Cara pakai:
---  1. Buat project Supabase BARU (jangan pakai project Juragan Terkaya v1)
+--  1. Buat project Supabase BARU (jangan pakai project game sebelumnya)
 --  2. Buka project tersebut -> menu "SQL Editor" -> "New query"
 --  3. Copy-paste SELURUH isi file ini, lalu klik "Run"
 --  4. Skrip ini aman dijalankan berulang kali (idempotent)
